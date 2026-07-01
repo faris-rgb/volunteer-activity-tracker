@@ -26,7 +26,8 @@ let mockVolunteers: VolunteerData[] = [];
 const isSanityConfigured = () => {
   return (
     process.env.NEXT_PUBLIC_SANITY_PROJECT_ID &&
-    process.env.NEXT_PUBLIC_SANITY_PROJECT_ID !== "placeholder_project_id"
+    process.env.NEXT_PUBLIC_SANITY_PROJECT_ID !== "placeholder_project_id" &&
+    process.env.NEXT_PUBLIC_SANITY_PROJECT_ID !== "mock-project-id"
   );
 };
 

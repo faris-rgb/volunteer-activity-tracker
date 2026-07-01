@@ -2,6 +2,11 @@
 
 import { sanityClient, sanityWriteClient } from "./sanity";
 import type { Volunteer, Activity, Attendance } from "../types";
+import type { SanityDocumentStub } from "@sanity/client";
+
+type VolunteerCreateDocument = SanityDocumentStub<Omit<Volunteer, "_id" | "createdAt">>;
+type ActivityCreateDocument = SanityDocumentStub<Omit<Activity, "_id" | "createdAt">>;
+type AttendanceCreateDocument = SanityDocumentStub<Omit<Attendance, "_id" | "createdAt">>;
 
 /** Volunteer CRUD */
 export async function getVolunteers({ search = "", sort = "firstName", active }: { search?: string; sort?: string; active?: boolean } = {}): Promise<Volunteer[]> {
@@ -18,17 +23,17 @@ export async function getVolunteers({ search = "", sort = "firstName", active }:
 }
 
 export async function createVolunteer(data: Omit<Volunteer, "_id" | "_type" | "createdAt">): Promise<Volunteer> {
-  const doc = {
+  const doc: VolunteerCreateDocument = {
     _type: "volunteer",
     ...data,
-  } as any;
-  const result = await sanityWriteClient.create(doc) as Volunteer;
-  return result;
+  };
+  const result = await sanityWriteClient.create(doc);
+  return result as unknown as Volunteer;
 }
 
 export async function updateVolunteer(id: string, data: Partial<Omit<Volunteer, "_id" | "_type" | "createdAt">>): Promise<Volunteer> {
-  const result = await sanityWriteClient.patch(id).set(data).commit() as Volunteer;
-  return result;
+  const result = await sanityWriteClient.patch(id).set(data).commit();
+  return result as unknown as Volunteer;
 }
 
 export async function deleteVolunteer(id: string): Promise<void> {
@@ -50,17 +55,17 @@ export async function getActivities({ search = "", sort = "date", status }: { se
 }
 
 export async function createActivity(data: Omit<Activity, "_id" | "_type" | "createdAt">): Promise<Activity> {
-  const doc = {
+  const doc: ActivityCreateDocument = {
     _type: "activity",
     ...data,
-  } as any;
-  const result = await sanityWriteClient.create(doc) as Activity;
-  return result;
+  };
+  const result = await sanityWriteClient.create(doc);
+  return result as unknown as Activity;
 }
 
 export async function updateActivity(id: string, data: Partial<Omit<Activity, "_id" | "_type" | "createdAt">>): Promise<Activity> {
-  const result = await sanityWriteClient.patch(id).set(data).commit() as Activity;
-  return result;
+  const result = await sanityWriteClient.patch(id).set(data).commit();
+  return result as unknown as Activity;
 }
 
 export async function deleteActivity(id: string): Promise<void> {
@@ -82,17 +87,17 @@ export async function getAttendance({ activityId, search = "", sort = "createdAt
 }
 
 export async function createAttendance(data: Omit<Attendance, "_id" | "_type" | "createdAt">): Promise<Attendance> {
-  const doc = {
+  const doc: AttendanceCreateDocument = {
     _type: "attendance",
     ...data,
-  } as any;
-  const result = await sanityWriteClient.create(doc) as Attendance;
-  return result;
+  };
+  const result = await sanityWriteClient.create(doc);
+  return result as unknown as Attendance;
 }
 
 export async function updateAttendance(id: string, data: Partial<Omit<Attendance, "_id" | "_type" | "createdAt">>): Promise<Attendance> {
-  const result = await sanityWriteClient.patch(id).set(data).commit() as Attendance;
-  return result;
+  const result = await sanityWriteClient.patch(id).set(data).commit();
+  return result as unknown as Attendance;
 }
 
 export async function deleteAttendance(id: string): Promise<void> {

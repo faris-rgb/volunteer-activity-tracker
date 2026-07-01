@@ -26,6 +26,7 @@ import {
   bulkRecordAttendanceAction 
 } from "@/app/actions/attendance";
 import { useRouter } from "next/navigation";
+import { formatLocalDate } from "@/lib/dates";
 
 interface AttendanceClientProps {
   volunteers: VolunteerData[];
@@ -119,7 +120,7 @@ export default function AttendanceClient({
 
     // Optimistic UI updates
     setRecords((prev) => {
-      let copy = [...prev];
+      const copy = [...prev];
       selectedVolunteers.forEach((vId) => {
         const idx = copy.findIndex((rec) => rec.volunteerId === vId && rec.activityId === selectedActivityId);
         if (idx >= 0) {
@@ -356,7 +357,7 @@ export default function AttendanceClient({
             {currentActivity && (
               <div className="p-3 bg-slate-900/40 border border-slate-800 rounded-xl space-y-1">
                 <span className="text-[10px] text-slate-500 font-bold block">DATE SCHEDULED</span>
-                <span className="text-xs text-slate-300 font-semibold block">{new Date(currentActivity.date).toLocaleDateString()}</span>
+                <span className="text-xs text-slate-300 font-semibold block">{formatLocalDate(currentActivity.date)}</span>
               </div>
             )}
           </div>

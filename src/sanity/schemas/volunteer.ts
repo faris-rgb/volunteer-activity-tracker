@@ -1,3 +1,5 @@
+import type { ValidationRule } from "./types";
+
 export const volunteerSchema = {
   name: "volunteer",
   title: "Volunteer",
@@ -7,19 +9,19 @@ export const volunteerSchema = {
       name: "firstName",
       title: "First Name",
       type: "string",
-      validation: (Rule: any) => Rule.required(),
+      validation: (Rule: ValidationRule) => Rule.required(),
     },
     {
       name: "lastName",
       title: "Last Name",
       type: "string",
-      validation: (Rule: any) => Rule.required(),
+      validation: (Rule: ValidationRule) => Rule.required(),
     },
     {
       name: "email",
       title: "Email",
       type: "string",
-      validation: (Rule: any) => Rule.required().email(),
+      validation: (Rule: ValidationRule) => Rule.required().email(),
     },
     {
       name: "phoneNumber",

@@ -19,6 +19,7 @@ import { getVolunteersAction } from "@/app/actions/volunteers";
 import { getActivitiesAction } from "@/app/actions/activities";
 import { getAttendanceRecordsAction } from "@/app/actions/attendance";
 import NextActivityCountdown from "@/components/NextActivityCountdown";
+import { formatLocalDate, getLocalDateTime } from "@/lib/dates";
 
 export const revalidate = 0; // Fresh stats on reload
 
@@ -100,7 +101,7 @@ export default async function Dashboard() {
   // Get closest upcoming activity
   const nextActivity = [...activities]
     .filter((a) => a.status === "Upcoming")
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0];
+    .sort((a, b) => getLocalDateTime(a.date) - getLocalDateTime(b.date))[0];
 
   // List upcoming activities
   const upcomingList = activities
@@ -303,7 +304,7 @@ export default async function Dashboard() {
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-slate-400 text-xs">
                         <span className="flex items-center gap-1">
                           <Calendar className="h-3.5 w-3.5 text-slate-500" />
-                          {new Date(act.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                          {formatLocalDate(act.date, { month: "short", day: "numeric", year: "numeric" })}
                         </span>
                         <span className="flex items-center gap-1">
                           <Clock className="h-3.5 w-3.5 text-slate-500" />

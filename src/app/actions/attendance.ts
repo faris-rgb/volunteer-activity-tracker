@@ -30,7 +30,7 @@ export interface AttendanceRecord {
 }
 
 // In-memory mock database for fallback
-let mockAttendance: AttendanceRecord[] = [
+const mockAttendance: AttendanceRecord[] = [
   {
     _id: "att-1",
     volunteerId: "mock-1", // Sarah Jenkins
@@ -165,8 +165,8 @@ export async function getAttendanceRecordsAction(activityId?: string): Promise<A
         }`;
 
     const params = activityId ? { activityId } : {};
-    const records = await sanityClient.fetch<any[]>(query, params);
-    return records as AttendanceRecord[];
+    const records = await sanityClient.fetch<AttendanceRecord[]>(query, params);
+    return records;
   } catch (error) {
     console.error("Failed to fetch attendance logs from Sanity:", error);
     return mockAttendance;

@@ -30,6 +30,7 @@ import {
   deleteActivityAction 
 } from "@/app/actions/activities";
 import { useRouter } from "next/navigation";
+import { formatLocalDate, getLocalDateTime } from "@/lib/dates";
 
 interface ActivitiesClientProps {
   initialActivities: ActivityData[];
@@ -196,8 +197,8 @@ export default function ActivitiesClient({ initialActivities }: ActivitiesClient
 
     // Sorting by date
     result.sort((a, b) => {
-      const dateA = new Date(a.date).getTime();
-      const dateB = new Date(b.date).getTime();
+      const dateA = getLocalDateTime(a.date);
+      const dateB = getLocalDateTime(b.date);
       return sortOrder === "asc" ? dateA - dateB : dateB - dateA;
     });
 
@@ -365,7 +366,7 @@ export default function ActivitiesClient({ initialActivities }: ActivitiesClient
                     </div>
                     <div className="flex items-center gap-2">
                       <Calendar className="h-3.5 w-3.5 text-slate-500 shrink-0" />
-                      <span>{new Date(act.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+                      <span>{formatLocalDate(act.date, { month: "short", day: "numeric", year: "numeric" })}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Clock className="h-3.5 w-3.5 text-slate-500 shrink-0" />
@@ -438,7 +439,7 @@ export default function ActivitiesClient({ initialActivities }: ActivitiesClient
                     </td>
                     <td className="py-4 px-6">
                       <div className="text-white font-medium">
-                        {new Date(act.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                        {formatLocalDate(act.date, { month: "short", day: "numeric", year: "numeric" })}
                       </div>
                       <div className="text-slate-500 text-xs flex items-center gap-1 mt-0.5">
                         <MapPin className="h-3 w-3" />

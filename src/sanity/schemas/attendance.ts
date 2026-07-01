@@ -1,3 +1,5 @@
+import type { ValidationRule } from "./types";
+
 export const attendanceSchema = {
   name: "attendance",
   title: "Attendance",
@@ -8,14 +10,14 @@ export const attendanceSchema = {
       title: "Volunteer",
       type: "reference",
       to: [{ type: "volunteer" }],
-      validation: (Rule: any) => Rule.required(),
+      validation: (Rule: ValidationRule) => Rule.required(),
     },
     {
       name: "activity",
       title: "Activity",
       type: "reference",
       to: [{ type: "activity" }],
-      validation: (Rule: any) => Rule.required(),
+      validation: (Rule: ValidationRule) => Rule.required(),
     },
     {
       name: "status",
@@ -28,7 +30,7 @@ export const attendanceSchema = {
           { title: "Late", value: "Late" },
         ],
       },
-      validation: (Rule: any) => Rule.required(),
+      validation: (Rule: ValidationRule) => Rule.required(),
     },
     {
       name: "checkInTime",

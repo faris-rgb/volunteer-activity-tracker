@@ -10,74 +10,81 @@ interface NextActivityCountdownProps {
   location: string;
 }
 
+interface TimeLeft {
+  days: number;
+  hours: number;
+  minutes: number;
+  seconds: number;
+  isOver: boolean;
+}
+
+const INITIAL_TIME_LEFT: TimeLeft = {
+  days: 0,
+  hours: 0,
+  minutes: 0,
+  seconds: 0,
+  isOver: false,
+};
+
+function parseTargetDate(activityDate: string, activityTime: string): Date {
+  try {
+    let hours = 9;
+    let minutes = 0;
+
+    const timeMatch = activityTime.match(/(\d+):(\d+)\s*(AM|PM)/i);
+    if (timeMatch) {
+      hours = parseInt(timeMatch[1], 10);
+      minutes = parseInt(timeMatch[2], 10);
+      const isPm = timeMatch[3].toUpperCase() === "PM";
+
+      if (isPm && hours !== 12) hours += 12;
+      if (!isPm && hours === 12) hours = 0;
+    }
+
+    return new Date(`${activityDate}T${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:00`);
+  } catch (err) {
+    console.error("Failed to parse activity target date:", err);
+    return new Date(Date.now() + 86400000);
+  }
+}
+
+function calculateTimeLeft(activityDate: string, activityTime: string): TimeLeft {
+  const targetDate = parseTargetDate(activityDate, activityTime);
+  const difference = targetDate.getTime() - new Date().getTime();
+
+  if (difference <= 0) {
+    return { days: 0, hours: 0, minutes: 0, seconds: 0, isOver: true };
+  }
+
+  return {
+    days: Math.floor(difference / (1000 * 60 * 60 * 24)),
+    hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
+    minutes: Math.floor((difference / 1000 / 60) % 60),
+    seconds: Math.floor((difference / 1000) % 60),
+    isOver: false
+  };
+}
+
 export default function NextActivityCountdown({ 
   activityTitle, 
   activityDate, 
   activityTime,
   location
 }: NextActivityCountdownProps) {
-  const [timeLeft, setTimeLeft] = useState<{
-    days: number;
-    hours: number;
-    minutes: number;
-    seconds: number;
-    isOver: boolean;
-  }>({ days: 0, hours: 0, minutes: 0, seconds: 0, isOver: false });
+  const [timeLeft, setTimeLeft] = useState<TimeLeft>(INITIAL_TIME_LEFT);
 
   useEffect(() => {
-    // Parse Date and Time
-    // Date format: YYYY-MM-DD
-    // Time format: HH:MM AM/PM
-    const parseTargetDate = () => {
-      try {
-        const datePart = activityDate; // e.g., "2026-06-28"
-        
-        let hours = 9;
-        let minutes = 0;
-        
-        const timeMatch = activityTime.match(/(\d+):(\d+)\s*(AM|PM)/i);
-        if (timeMatch) {
-          hours = parseInt(timeMatch[1], 10);
-          minutes = parseInt(timeMatch[2], 10);
-          const isPm = timeMatch[3].toUpperCase() === "PM";
-          
-          if (isPm && hours !== 12) hours += 12;
-          if (!isPm && hours === 12) hours = 0;
-        }
-        
-        const target = new Date(`${datePart}T${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:00`);
-        return target;
-      } catch (err) {
-        console.error("Failed to parse activity target date:", err);
-        return new Date(Date.now() + 86400000); // fallback 1 day in future
-      }
+    const updateTimeLeft = () => {
+      setTimeLeft(calculateTimeLeft(activityDate, activityTime));
     };
 
-    const targetDate = parseTargetDate();
+    const initialTimer = window.setTimeout(updateTimeLeft, 0);
+    const timer = window.setInterval(updateTimeLeft, 1000);
 
-    const calculateTimeLeft = () => {
-      const difference = targetDate.getTime() - new Date().getTime();
-      
-      if (difference <= 0) {
-        return { days: 0, hours: 0, minutes: 0, seconds: 0, isOver: true };
-      }
-
-      return {
-        days: Math.floor(difference / (1000 * 60 * 60 * 24)),
-        hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
-        minutes: Math.floor((difference / 1000 / 60) % 60),
-        seconds: Math.floor((difference / 1000) % 60),
-        isOver: false
-      };
+    return () => {
+      window.clearTimeout(initialTimer);
+      window.clearInterval(timer);
     };
-
-    setTimeLeft(calculateTimeLeft());
-    
-    const timer = setInterval(() => {
-      setTimeLeft(calculateTimeLeft());
-    }, 1000);
-
-    return () => clearInterval(timer);
   }, [activityDate, activityTime]);
 
   if (timeLeft.isOver) {

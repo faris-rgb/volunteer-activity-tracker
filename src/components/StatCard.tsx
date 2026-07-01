@@ -1,12 +1,12 @@
 "use client";
 
 import React from "react";
-import { Icon as LucideIcon } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 interface StatCardProps {
   title: string;
   value: string | number;
-  Icon: React.ComponentType<any>;
+  Icon: LucideIcon;
 }
 
 export default function StatCard({ title, value, Icon }: StatCardProps) {

@@ -1,3 +1,5 @@
+import type { ValidationRule } from "./types";
+
 export const activitySchema = {
   name: "activity",
   title: "Activity",
@@ -7,7 +9,7 @@ export const activitySchema = {
       name: "title",
       title: "Title",
       type: "string",
-      validation: (Rule: any) => Rule.required(),
+      validation: (Rule: ValidationRule) => Rule.required(),
     },
     {
       name: "description",
@@ -18,39 +20,39 @@ export const activitySchema = {
       name: "date",
       title: "Date",
       type: "date",
-      validation: (Rule: any) => Rule.required(),
+      validation: (Rule: ValidationRule) => Rule.required(),
     },
     {
       name: "startTime",
       title: "Start Time",
       type: "string",
       placeholder: "e.g. 09:00 AM",
-      validation: (Rule: any) => Rule.required(),
+      validation: (Rule: ValidationRule) => Rule.required(),
     },
     {
       name: "endTime",
       title: "End Time",
       type: "string",
       placeholder: "e.g. 01:00 PM",
-      validation: (Rule: any) => Rule.required(),
+      validation: (Rule: ValidationRule) => Rule.required(),
     },
     {
       name: "location",
       title: "Location",
       type: "string",
-      validation: (Rule: any) => Rule.required(),
+      validation: (Rule: ValidationRule) => Rule.required(),
     },
     {
       name: "maxVolunteers",
       title: "Maximum Volunteers",
       type: "number",
-      validation: (Rule: any) => Rule.required().min(1),
+      validation: (Rule: ValidationRule) => Rule.required().min(1),
     },
     {
       name: "category",
       title: "Category",
       type: "string",
-      validation: (Rule: any) => Rule.required(),
+      validation: (Rule: ValidationRule) => Rule.required(),
     },
     {
       name: "status",
@@ -64,7 +66,7 @@ export const activitySchema = {
         ],
       },
       initialValue: "Upcoming",
-      validation: (Rule: any) => Rule.required(),
+      validation: (Rule: ValidationRule) => Rule.required(),
     },
     {
       name: "createdAt",
