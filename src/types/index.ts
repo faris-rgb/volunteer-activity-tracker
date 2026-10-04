@@ -1,5 +1,7 @@
 // src/types/index.ts
 
+export type { AppUserData as AppUser } from "@/lib/appUsers";
+
 export interface Volunteer {
   _id: string;
   _type: 'volunteer';
