@@ -108,8 +108,8 @@ export default function ChipInput({
                 onClick={() => toggle(preset)}
                 className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-60 ${
                   selected
-                    ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-300"
-                    : "border-slate-800 bg-slate-950 text-slate-400 hover:border-slate-700 hover:text-white"
+                    ? "border-red-300 bg-red-50 text-brand-red"
+                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900"
                 }`}
               >
                 {selected ? (
@@ -129,7 +129,7 @@ export default function ChipInput({
           {custom.map((item) => (
             <li
               key={item}
-              className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/15 py-1 pl-3 pr-1 text-xs font-medium text-emerald-300"
+              className="inline-flex items-center gap-1 rounded-full border border-red-300 bg-red-50 py-1 pl-3 pr-1 text-xs font-medium text-brand-red"
             >
               {item}
               <button
@@ -137,7 +137,7 @@ export default function ChipInput({
                 disabled={disabled}
                 onClick={() => toggle(item)}
                 aria-label={`Remove ${item}`}
-                className="rounded-full p-1 transition-colors hover:bg-emerald-500/20 hover:text-white"
+                className="rounded-full p-1 transition-colors hover:bg-emerald-500/20 hover:text-slate-900"
               >
                 <X className="h-3 w-3" aria-hidden="true" />
               </button>
@@ -164,22 +164,22 @@ export default function ChipInput({
           placeholder={placeholder}
           aria-invalid={invalid || undefined}
           aria-describedby={describedByIds}
-          className={`min-w-0 flex-1 rounded-xl border bg-slate-950 px-4 py-2.5 text-sm text-white placeholder-slate-600 transition-colors focus:outline-none disabled:opacity-60 ${
-            invalid ? "border-rose-500/60 focus:border-rose-400" : "border-slate-800 focus:border-emerald-500/50"
+          className={`min-w-0 flex-1 rounded-xl border bg-white px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 transition-colors focus:outline-none disabled:opacity-60 ${
+            invalid ? "border-rose-400 focus:border-rose-500" : "border-slate-200 focus:border-brand-red"
           }`}
         />
         <button
           type="button"
           disabled={disabled || !draft.trim()}
           onClick={() => add(draft)}
-          className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-slate-800 bg-slate-900 px-3 py-2.5 text-sm font-semibold text-slate-300 transition-colors hover:border-emerald-500/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:border-red-300 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Plus className="h-4 w-4" aria-hidden="true" />
           Add
         </button>
       </div>
       {hint && (
-        <p id={hintId} role="status" className="text-xs text-amber-300">
+        <p id={hintId} role="status" className="text-xs text-amber-700">
           {hint}
         </p>
       )}

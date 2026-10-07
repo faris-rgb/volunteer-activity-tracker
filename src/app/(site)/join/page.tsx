@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { connection } from "next/server";
 import { getPublicJoinData, issueFormToken } from "@/lib/publicJoin";
-import { moroccoToday } from "./joinShared";
-import JoinClient from "./JoinClient";
+import { moroccoToday } from "@/app/join/joinShared";
+import JoinClient from "@/app/join/JoinClient";
 
 // Public "Join us" page (no sign-in; src/proxy.ts allows /join). It lives outside the (app) route group,
 // so it never renders the staff layout. Only public project fields and organisation contact details are
@@ -12,7 +12,7 @@ const DESCRIPTION =
   "Volunteer with us in Martil & Tetouan: community projects, European Solidarity Corps (ESC) placements and local volunteering. Apply online in a few minutes.";
 
 export const metadata: Metadata = {
-  title: "Join us — Volunteer in Morocco",
+  title: "Join us",
   description: DESCRIPTION,
   openGraph: {
     title: "Volunteer in Morocco — Martil & Tetouan",

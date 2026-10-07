@@ -56,7 +56,7 @@ export default async function PendingRolePage() {
   }
 
   if (appUser?.role) {
-    redirect("/");
+    redirect("/dashboard");
   }
 
   if (!appUser) {

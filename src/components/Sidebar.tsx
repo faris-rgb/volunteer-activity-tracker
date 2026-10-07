@@ -28,7 +28,7 @@ interface SidebarProps {
 }
 
 const MENU_GROUPS = [
-  { title: "Overview", items: [{ name: "Dashboard", href: "/", icon: LayoutDashboard }] },
+  { title: "Overview", items: [{ name: "Dashboard", href: "/dashboard", icon: LayoutDashboard }] },
   {
     title: "Programme",
     items: [
@@ -123,8 +123,8 @@ export default function Sidebar({
   return (
     <>
       <header className="lg:hidden print:hidden flex items-center justify-between px-5 py-3 bg-slate-950/90 backdrop-blur text-white border-b border-slate-800/70 sticky top-0 z-40 w-full">
-        <Link href="/" className="flex items-center gap-2.5">
-          <BrandMark className="h-8 w-8" />
+        <Link href="/dashboard" className="flex items-center gap-2.5">
+          <BrandMark className="h-9 w-9" />
           <span className="font-bold tracking-tight text-white">Volunteer in Morocco</span>
         </Link>
         <button
@@ -158,9 +158,9 @@ export default function Sidebar({
       >
         <div className="relative h-24 shrink-0 flex items-center justify-between px-5 border-b border-slate-800/60 overflow-hidden">
           <div className="pointer-events-none absolute inset-0 bg-zellige opacity-[0.07]" aria-hidden="true" />
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-brand-red via-emerald-500 to-brand-red" aria-hidden="true" />
-          <Link href="/" className="relative flex items-center gap-3" onClick={closeSidebar}>
-            <BrandMark className="h-11 w-11 drop-shadow-[0_4px_12px_rgba(16,185,129,0.35)]" />
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-1 brand-rainbow" aria-hidden="true" />
+          <Link href="/dashboard" className="relative flex items-center gap-3" onClick={closeSidebar}>
+            <BrandMark className="h-12 w-12" />
             <span className="leading-tight">
               <span className="block font-extrabold text-[15px] tracking-tight text-white">Volunteer in Morocco</span>
               <span className="block text-[11px] font-medium text-brand-sand/80">Martil · Tetouan</span>

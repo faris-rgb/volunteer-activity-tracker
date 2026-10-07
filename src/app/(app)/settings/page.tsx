@@ -7,7 +7,7 @@ import { getEditablePortalSettingsAction, type EditablePortalSettings } from "@/
 import SettingsClient, { type SettingsProfile } from "./SettingsClient";
 
 export const metadata: Metadata = {
-  title: "Settings | ServeTrack",
+  title: "Settings",
 };
 
 async function loadProfile(user: RoleUser): Promise<SettingsProfile> {

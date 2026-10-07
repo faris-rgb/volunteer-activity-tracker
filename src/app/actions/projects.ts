@@ -582,6 +582,7 @@ function revalidateProjectPages() {
   revalidatePath("/stays");
   revalidatePath("/activities");
   revalidatePath("/join");
+  revalidatePath("/dashboard");
   revalidatePath("/");
 }
 

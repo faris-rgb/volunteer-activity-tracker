@@ -83,7 +83,7 @@ export async function requireAssignedRole(): Promise<RoleUser> {
 export async function requireRole(allowedRoles: AppRole[]): Promise<RoleUser> {
   const appUser = await requireAssignedRole();
   if (!allowedRoles.includes(appUser.role)) {
-    redirect("/");
+    redirect("/dashboard");
   }
   return appUser;
 }
@@ -91,7 +91,7 @@ export async function requireRole(allowedRoles: AppRole[]): Promise<RoleUser> {
 export async function requireRouteAccess(pathname: string): Promise<RoleUser> {
   const appUser = await requireAssignedRole();
   if (!canRoleAccessRoute(appUser.role, pathname)) {
-    redirect("/");
+    redirect("/dashboard");
   }
   return appUser;
 }

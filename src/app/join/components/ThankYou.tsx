@@ -27,19 +27,19 @@ export default function ThankYou({
 
   return (
     <section aria-labelledby="join-thank-you-title" className="mx-auto max-w-2xl px-4 py-16 sm:px-6 sm:py-24">
-      <div className="rounded-3xl border border-emerald-500/20 bg-slate-900/80 p-6 text-center shadow-2xl shadow-emerald-500/5 sm:p-10">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-emerald-500/30 bg-emerald-500/10">
-          <CircleCheckBig className="h-8 w-8 text-emerald-400" aria-hidden="true" />
+      <div className="rounded-3xl border border-red-200 bg-slate-900/80 p-6 text-center shadow-2xl shadow-emerald-500/5 sm:p-10">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-red-200 bg-red-50">
+          <CircleCheckBig className="h-8 w-8 text-brand-red" aria-hidden="true" />
         </div>
         <h1
           id="join-thank-you-title"
           ref={headingRef}
           tabIndex={-1}
-          className="mt-6 text-2xl font-bold tracking-tight text-white focus:outline-none sm:text-3xl"
+          className="mt-6 text-2xl font-bold tracking-tight text-slate-900 focus:outline-none sm:text-3xl"
         >
           Thank you{firstName ? `, ${firstName}` : ""}!
         </h1>
-        <p className="mt-3 text-base leading-relaxed text-slate-300">
+        <p className="mt-3 text-base leading-relaxed text-slate-700">
           Your application has reached {org.organizationName}. We&apos;ll contact you on WhatsApp or by email within a
           few days.
         </p>
@@ -48,17 +48,17 @@ export default function ThankYou({
           {NEXT_STEPS.map((step, index) => (
             <li
               key={step.title}
-              className="flex items-start gap-3 rounded-2xl border border-slate-800 bg-slate-950/60 p-4"
+              className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4"
             >
               <span
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-xs font-bold text-slate-950"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-red text-xs font-bold text-white"
                 aria-hidden="true"
               >
                 {index + 1}
               </span>
               <span>
-                <span className="block text-sm font-semibold text-white">{step.title}</span>
-                <span className="mt-0.5 block text-sm text-slate-400">{step.text}</span>
+                <span className="block text-sm font-semibold text-slate-900">{step.title}</span>
+                <span className="mt-0.5 block text-sm text-slate-600">{step.text}</span>
               </span>
             </li>
           ))}
@@ -71,7 +71,7 @@ export default function ThankYou({
                 href={org.instagramUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-800/60 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:border-emerald-500/40 hover:bg-slate-800"
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-slate-800/60 px-4 py-2.5 text-sm font-semibold text-slate-900 transition-colors hover:border-red-300 hover:bg-slate-100"
               >
                 <InstagramIcon className="h-4 w-4" />
                 Follow us on Instagram
@@ -82,7 +82,7 @@ export default function ThankYou({
                 href={whatsapp}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-800/60 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:border-emerald-500/40 hover:bg-slate-800"
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-slate-800/60 px-4 py-2.5 text-sm font-semibold text-slate-900 transition-colors hover:border-red-300 hover:bg-slate-100"
               >
                 <MessageCircle className="h-4 w-4" aria-hidden="true" />
                 WhatsApp us
@@ -91,7 +91,7 @@ export default function ThankYou({
             {org.contactEmail && (
               <a
                 href={`mailto:${org.contactEmail}`}
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-800/60 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:border-emerald-500/40 hover:bg-slate-800"
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-slate-800/60 px-4 py-2.5 text-sm font-semibold text-slate-900 transition-colors hover:border-red-300 hover:bg-slate-100"
               >
                 <Mail className="h-4 w-4" aria-hidden="true" />
                 Email us
@@ -103,7 +103,7 @@ export default function ThankYou({
         <button
           type="button"
           onClick={onBack}
-          className="mt-8 inline-flex items-center gap-2 text-sm font-semibold text-emerald-400 transition-colors hover:text-emerald-300"
+          className="mt-8 inline-flex items-center gap-2 text-sm font-semibold text-brand-red transition-colors hover:text-[#a51f24]"
         >
           <ArrowLeft className="h-4 w-4" aria-hidden="true" />
           Back to the projects

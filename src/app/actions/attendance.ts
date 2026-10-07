@@ -237,7 +237,7 @@ function revalidateAttendanceViews() {
   revalidatePath("/attendance");
   revalidatePath("/activities");
   revalidatePath("/volunteers");
-  revalidatePath("/");
+  revalidatePath("/dashboard");
 }
 
 function failure(error: unknown, fallback: string): ActionResult<never> {

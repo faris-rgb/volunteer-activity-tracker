@@ -560,7 +560,7 @@ function revalidateVolunteerPages() {
   revalidatePath("/attendance");
   revalidatePath("/stays");
   revalidatePath("/projects");
-  revalidatePath("/");
+  revalidatePath("/dashboard");
 }
 
 function failure(error: unknown, fallback: string): ActionResult<never> {

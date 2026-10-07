@@ -879,7 +879,7 @@ export default function AttendanceClient({
 
   return (
     <div className="flex-1 p-6 md:p-8 space-y-8 max-w-7xl mx-auto w-full print:p-0 print:space-y-4 print:text-black">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-6 print:hidden">
+      <div className="page-header flex flex-col sm:flex-row sm:items-center justify-between gap-4 print:hidden">
         <div>
           <h1 className="text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
             <CheckSquare className="h-8 w-8 text-emerald-400" />

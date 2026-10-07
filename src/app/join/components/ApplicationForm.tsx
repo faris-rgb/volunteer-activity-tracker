@@ -37,11 +37,11 @@ import { DIET_OPTIONS, type DietOption } from "@/lib/domain";
 
 /* ---------- Styles (match the staff portal's dark slate + emerald inputs) ---------- */
 
-const LABEL_CLASS = "block text-xs font-semibold uppercase tracking-wider text-slate-400";
+const LABEL_CLASS = "block text-xs font-semibold uppercase tracking-wider text-slate-600";
 
 function inputClass(error?: string) {
-  return `w-full rounded-xl border bg-slate-950 px-4 py-2.5 text-sm text-white placeholder-slate-600 transition-colors focus:outline-none disabled:opacity-60 ${
-    error ? "border-rose-500/60 focus:border-rose-400" : "border-slate-800 focus:border-emerald-500/50"
+  return `w-full rounded-xl border bg-white px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 transition-colors focus:outline-none disabled:opacity-60 ${
+    error ? "border-rose-400 focus:border-rose-500" : "border-slate-200 focus:border-brand-red"
   }`;
 }
 
@@ -56,7 +56,7 @@ function describedBy(field: ApplicationField, error: string | undefined, hasHint
 function FieldMessage({ field, error, hint }: { field: ApplicationField; error?: string; hint?: ReactNode }) {
   if (error) {
     return (
-      <p id={`${fieldId(field)}-error`} className="flex items-start gap-1.5 text-xs text-rose-400">
+      <p id={`${fieldId(field)}-error`} className="flex items-start gap-1.5 text-xs text-rose-600">
         <CircleAlert className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" />
         {error}
       </p>
@@ -75,12 +75,12 @@ function LabelText({ children, required }: { children: ReactNode; required?: boo
     <>
       {children}
       {required ? (
-        <span className="text-emerald-400" aria-hidden="true">
+        <span className="text-brand-red" aria-hidden="true">
           {" "}
           *
         </span>
       ) : (
-        <span className="font-normal normal-case tracking-normal text-slate-600"> (optional)</span>
+        <span className="font-normal normal-case tracking-normal text-slate-500"> (optional)</span>
       )}
     </>
   );
@@ -126,15 +126,15 @@ function FormSection({
   const titleId = `join-step-${step}-title`;
   return (
     <section aria-labelledby={titleId} className="space-y-4">
-      <div className="flex items-start gap-3 border-b border-slate-800 pb-3">
+      <div className="flex items-start gap-3 border-b border-slate-200 pb-3">
         <span
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/10 text-xs font-bold text-emerald-300"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-red-200 bg-red-50 text-xs font-bold text-brand-red"
           aria-hidden="true"
         >
           {step}
         </span>
         <div className="min-w-0">
-          <h3 id={titleId} className="text-sm font-bold uppercase tracking-wider text-white">
+          <h3 id={titleId} className="text-sm font-bold uppercase tracking-wider text-slate-900">
             {title}
           </h3>
           {description && <p className="mt-0.5 text-xs text-slate-500">{description}</p>}
@@ -198,7 +198,7 @@ function TextInput({
         aria-invalid={error ? true : undefined}
         aria-describedby={describedBy(field, error, !!hint)}
         disabled={disabled}
-        className={`${inputClass(error)}${type === "date" ? " [color-scheme:dark]" : ""}`}
+        className={`${inputClass(error)}${type === "date" ? " [color-scheme:light]" : ""}`}
       />
     </Field>
   );
@@ -409,7 +409,7 @@ export default function ApplicationForm({
   return (
     <form noValidate onSubmit={handleSubmit} aria-describedby="join-form-required-note" className="relative space-y-8">
       <p id="join-form-required-note" className="text-xs text-slate-500">
-        Fields marked <span className="text-emerald-400">*</span> are required. It takes about 10 minutes.
+        Fields marked <span className="text-brand-red">*</span> are required. It takes about 10 minutes.
       </p>
 
       {/* Honeypot: hidden from people and assistive technology; bots that fill it are ignored. */}
@@ -477,7 +477,7 @@ export default function ApplicationForm({
               aria-invalid={errors.dateOfBirth ? true : undefined}
               aria-describedby={describedBy("dateOfBirth", errors.dateOfBirth, true)}
               disabled={submitting}
-              className={`${inputClass(errors.dateOfBirth)} [color-scheme:dark]`}
+              className={`${inputClass(errors.dateOfBirth)} [color-scheme:light]`}
             />
           </Field>
           <Field field="nationality" label="Nationality" required error={errors.nationality}>
@@ -668,10 +668,10 @@ export default function ApplicationForm({
                   key={type}
                   className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors ${
                     checked
-                      ? "border-emerald-500/50 bg-emerald-500/10"
+                      ? "border-red-300 bg-red-50"
                       : errors.volunteerType
-                        ? "border-rose-500/40 bg-slate-950 hover:border-rose-400/60"
-                        : "border-slate-800 bg-slate-950 hover:border-slate-700"
+                        ? "border-rose-300 bg-white hover:border-rose-400"
+                        : "border-slate-200 bg-white hover:border-slate-300"
                   }`}
                 >
                   <input
@@ -683,11 +683,11 @@ export default function ApplicationForm({
                     required
                     disabled={submitting}
                     onChange={() => update("volunteerType", type)}
-                    className="mt-0.5 h-4 w-4 shrink-0 accent-emerald-500"
+                    className="mt-0.5 h-4 w-4 shrink-0 accent-[#C1272D]"
                   />
                   <span className="min-w-0">
-                    <span className="block text-sm font-semibold text-white">{option.label}</span>
-                    <span className="mt-0.5 block text-xs leading-relaxed text-slate-400">{option.description}</span>
+                    <span className="block text-sm font-semibold text-slate-900">{option.label}</span>
+                    <span className="mt-0.5 block text-xs leading-relaxed text-slate-600">{option.description}</span>
                   </span>
                 </label>
               );
@@ -695,7 +695,7 @@ export default function ApplicationForm({
           </div>
           <FieldMessage field="volunteerType" error={errors.volunteerType} />
           {values.volunteerType === "incoming_esc" && (
-            <p className="flex items-start gap-2 rounded-xl border border-sky-500/20 bg-sky-500/10 px-3 py-2.5 text-xs leading-relaxed text-sky-200">
+            <p className="flex items-start gap-2 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2.5 text-xs leading-relaxed text-sky-800">
               <Info className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               ESC placements are funded by the European Solidarity Corps. If you already have a sending organisation,
               mention it below. We help with your arrival via Tangier or Tetouan airport.
@@ -731,15 +731,15 @@ export default function ApplicationForm({
             </select>
           </Field>
         ) : (
-          <p className="flex items-start gap-2 rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2.5 text-xs leading-relaxed text-slate-400">
-            <Info className="mt-px h-3.5 w-3.5 shrink-0 text-emerald-400" aria-hidden="true" />
+          <p className="flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs leading-relaxed text-slate-600">
+            <Info className="mt-px h-3.5 w-3.5 shrink-0 text-brand-red" aria-hidden="true" />
             This is a general application — we&apos;ll match you with an activity or project that fits you.
           </p>
         )}
 
         {selectedProject && (
-          <p className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-3 py-2.5 text-xs leading-relaxed text-emerald-200">
-            <span className="font-semibold text-emerald-300">{selectedProject.name}</span>
+          <p className="rounded-xl border border-red-200 bg-red-50/60 px-3 py-2.5 text-xs leading-relaxed text-red-800">
+            <span className="font-semibold text-brand-red">{selectedProject.name}</span>
             {" · "}
             {formatDateRange(selectedProject.startDate, selectedProject.endDate)}
             {selectedProject.location && ` · ${selectedProject.location}`}
@@ -754,8 +754,8 @@ export default function ApplicationForm({
               key={hint.message}
               className={`flex items-start gap-2 rounded-xl border px-3 py-2.5 text-xs leading-relaxed ${
                 hint.tone === "warning"
-                  ? "border-amber-500/30 bg-amber-500/10 text-amber-200"
-                  : "border-sky-500/20 bg-sky-500/10 text-sky-200"
+                  ? "border-amber-200 bg-amber-50 text-amber-800"
+                  : "border-sky-200 bg-sky-50 text-sky-800"
               }`}
             >
               {hint.tone === "warning" ? (
@@ -970,7 +970,7 @@ export default function ApplicationForm({
             <span
               id="join-motivation-count"
               className={`shrink-0 text-xs tabular-nums ${
-                motivationLength > APPLICATION_LIMITS.motivation * 0.9 ? "text-amber-300" : "text-slate-500"
+                motivationLength > APPLICATION_LIMITS.motivation * 0.9 ? "text-amber-700" : "text-slate-500"
               }`}
             >
               {motivationLength}/{APPLICATION_LIMITS.motivation}
@@ -998,18 +998,18 @@ export default function ApplicationForm({
           </select>
         </Field>
 
-        <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-800 bg-slate-950 p-4 transition-colors hover:border-slate-700">
+        <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 transition-colors hover:border-slate-300">
           <input
             id={fieldId("photoConsent")}
             type="checkbox"
             checked={values.photoConsent}
             disabled={submitting}
             onChange={(event) => update("photoConsent", event.target.checked)}
-            className="mt-0.5 h-4 w-4 shrink-0 accent-emerald-500"
+            className="mt-0.5 h-4 w-4 shrink-0 accent-[#C1272D]"
           />
-          <span className="text-sm leading-relaxed text-slate-300">
+          <span className="text-sm leading-relaxed text-slate-700">
             {orgName} may use photos and videos of me taken during activities on social media.
-            <span className="font-normal text-slate-600"> (optional)</span>
+            <span className="font-normal text-slate-500"> (optional)</span>
           </span>
         </label>
 
@@ -1017,8 +1017,8 @@ export default function ApplicationForm({
           <label
             className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition-colors ${
               errors.consent
-                ? "border-rose-500/50 bg-rose-500/5"
-                : "border-slate-800 bg-slate-950 hover:border-slate-700"
+                ? "border-rose-300 bg-rose-50"
+                : "border-slate-200 bg-white hover:border-slate-300"
             }`}
           >
             <input
@@ -1030,13 +1030,13 @@ export default function ApplicationForm({
               onChange={(event) => update("consent", event.target.checked)}
               aria-invalid={errors.consent ? true : undefined}
               aria-describedby={describedBy("consent", errors.consent)}
-              className="mt-0.5 h-4 w-4 shrink-0 accent-emerald-500"
+              className="mt-0.5 h-4 w-4 shrink-0 accent-[#C1272D]"
             />
-            <span className="text-sm leading-relaxed text-slate-300">
+            <span className="text-sm leading-relaxed text-slate-700">
               I agree that {orgName} stores the details in this form, uses them to process my application and to
               contact me about volunteering, and shares them with its partner organisation Stichting Cultined and the
               organisers of the project I apply for.
-              <span className="text-emerald-400" aria-hidden="true">
+              <span className="text-brand-red" aria-hidden="true">
                 {" "}
                 *
               </span>
@@ -1049,11 +1049,11 @@ export default function ApplicationForm({
         </div>
       </FormSection>
 
-      <div className="space-y-3 border-t border-slate-800 pt-6">
+      <div className="space-y-3 border-t border-slate-200 pt-6">
         {formError && (
           <div
             role="alert"
-            className="flex items-start gap-2 rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-300"
+            className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"
           >
             <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
             <span>{formError}</span>
@@ -1063,7 +1063,7 @@ export default function ApplicationForm({
           type="submit"
           disabled={submitting}
           aria-disabled={submitting}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 px-6 py-3 text-sm font-bold text-slate-950 shadow-lg shadow-emerald-500/20 transition-colors hover:bg-emerald-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 disabled:cursor-wait disabled:opacity-70 sm:w-auto"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-red px-6 py-3 text-sm font-bold text-white shadow-lg shadow-red-500/20 transition-colors hover:bg-[#a51f24] focus:outline-none focus-visible:ring-2 focus-visible:ring-red-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-wait disabled:opacity-70 sm:w-auto"
         >
           {submitting ? (
             <>

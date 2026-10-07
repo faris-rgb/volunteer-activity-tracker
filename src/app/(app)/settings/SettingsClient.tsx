@@ -1063,7 +1063,7 @@ function SettingsLoadError({ profile }: { profile: SettingsProfile }) {
 
 function SettingsHeader({ status, actions }: { status?: ReactNode; actions?: ReactNode }) {
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-6">
+    <div className="page-header flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div>
         <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
           <Settings className="h-7 w-7 sm:h-8 sm:w-8 text-emerald-400" />

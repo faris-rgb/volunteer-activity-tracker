@@ -7,6 +7,8 @@
   --brand-green: #10b981;
   --brand-red: #c1272d;
   --brand-sand: #f5d9a8;
+  /* Petal colours of the Volunteer in Morocco logo */
+  --brand-rainbow: linear-gradient(90deg, #f2d21b, #f7931e, #d6267a, #e30613, #6c3ba6, #1e88e5, #6aa121);
   --zellige: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56' viewBox='0 0 56 56'%3E%3Cg fill='none' stroke='%2310b981' stroke-width='1'%3E%3Crect x='18' y='18' width='20' height='20'/%3E%3Crect x='18' y='18' width='20' height='20' transform='rotate(45 28 28)'/%3E%3Ccircle cx='28' cy='28' r='4'/%3E%3Cpath d='M0 0l8 8M56 0l-8 8M0 56l8-8M56 56l-8-8'/%3E%3C/g%3E%3C/svg%3E");
 }
 
@@ -15,7 +17,7 @@
   --color-foreground: var(--foreground);
   --color-brand-sand: var(--brand-sand);
   --color-brand-red: var(--brand-red);
-  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
   --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
 
@@ -38,6 +40,10 @@ body {
     var(--background);
 }
 
+.brand-rainbow {
+  background: var(--brand-rainbow);
+}
+
 .brand-gradient-text {
   background: linear-gradient(90deg, #6ee7b7 0%, #f5d9a8 100%);
   -webkit-background-clip: text;
@@ -48,5 +54,65 @@ body {
 @media print {
   body {
     background: #fff;
+  }
+}
+
+/* Shared page header: a soft banner with the zellige pattern and flag accent. */
+.page-header {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1.5rem;
+  border: 1px solid rgba(16, 185, 129, 0.16);
+  background: linear-gradient(135deg, rgba(5, 150, 105, 0.18), rgba(2, 6, 23, 0.85) 55%, rgba(2, 6, 23, 0.85));
+  padding: 1.25rem 1.25rem;
+  box-shadow: 0 20px 50px -35px rgba(16, 185, 129, 0.55);
+}
+@media (min-width: 640px) {
+  .page-header {
+    padding: 1.5rem 1.75rem;
+  }
+}
+.page-header::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: var(--zellige);
+  background-size: 56px 56px;
+  opacity: 0.07;
+  pointer-events: none;
+}
+.page-header::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: var(--brand-rainbow);
+  opacity: 0.9;
+  pointer-events: none;
+}
+.page-header > * {
+  position: relative;
+}
+.page-header a,
+.page-header button {
+  white-space: nowrap;
+}
+.page-header h1 > svg {
+  box-sizing: content-box;
+  padding: 0.5rem;
+  border-radius: 0.9rem;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.28);
+}
+@media print {
+  .page-header {
+    border: 0;
+    background: none;
+    box-shadow: none;
+    padding: 0;
+  }
+  .page-header::before,
+  .page-header::after {
+    display: none;
   }
 }

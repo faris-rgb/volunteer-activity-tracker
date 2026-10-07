@@ -431,7 +431,7 @@ function failure(error: unknown, fallback: string): ActionResult<never> {
 function revalidateStayPages() {
   revalidatePath("/stays");
   revalidatePath("/projects");
-  revalidatePath("/");
+  revalidatePath("/dashboard");
 }
 
 /* ---------- Data access ---------- */

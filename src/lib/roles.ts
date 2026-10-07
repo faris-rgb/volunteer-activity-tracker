@@ -16,7 +16,7 @@ export const MANAGER_ROLES: AppRole[] = ["owner", "admin", "staff"];
 export const ADMIN_ROLES: AppRole[] = ["owner", "admin"];
 
 export const ROUTE_PERMISSIONS: Record<string, AppRole[]> = {
-  "/": ["owner", "admin", "staff", "volunteer"],
+  "/dashboard": ["owner", "admin", "staff", "volunteer"],
   "/volunteers": MANAGER_ROLES,
   "/activities": ["owner", "admin", "staff", "volunteer"],
   "/attendance": ["owner", "admin", "staff", "volunteer"],

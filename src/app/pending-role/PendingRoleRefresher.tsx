@@ -38,7 +38,7 @@ export default function PendingRoleRefresher({
         setError(null);
         setLastChecked(new Date());
         if (result.data.hasRole) {
-          router.replace("/");
+          router.replace("/dashboard");
         } else if (refreshOnCheck) {
           router.refresh();
         }

@@ -583,7 +583,7 @@ function revalidateActivityPages() {
   revalidatePath("/attendance");
   revalidatePath("/volunteers");
   revalidatePath("/projects");
-  revalidatePath("/");
+  revalidatePath("/dashboard");
 }
 
 /** assertActionRole only throws user-safe messages (signed out / missing role / account lookup failed). */

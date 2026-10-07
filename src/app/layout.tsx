@@ -1,12 +1,13 @@
 import type { ComponentProps } from "react";
 import type { Metadata, Viewport } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
-import { Plus_Jakarta_Sans } from "next/font/google";
+import { Outfit } from "next/font/google";
 import "./globals.css";
 
-const jakarta = Plus_Jakarta_Sans({
+// Outfit: the typeface of the original volunteerinmorocco.com website.
+const outfit = Outfit({
   subsets: ["latin", "latin-ext"],
-  variable: "--font-jakarta",
+  variable: "--font-outfit",
   display: "swap",
 });
 
@@ -54,14 +55,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`h-full antialiased ${jakarta.variable}`}>
+    <html lang="en" className={`h-full antialiased ${outfit.variable}`}>
       <body className="min-h-screen app-backdrop text-slate-100! font-sans">
         <ClerkProvider
           appearance={clerkAppearance}
           signInUrl="/sign-in"
           signUpUrl="/sign-up"
-          signInFallbackRedirectUrl="/"
-          signUpFallbackRedirectUrl="/"
+          signInFallbackRedirectUrl="/dashboard"
+          signUpFallbackRedirectUrl="/dashboard"
           afterSignOutUrl="/sign-in"
         >
           {children}

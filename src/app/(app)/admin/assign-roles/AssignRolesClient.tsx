@@ -341,7 +341,7 @@ export default function AssignRolesClient({ users: initialUsers, currentUser }: 
 
   return (
     <div className="flex-1 p-6 md:p-8 space-y-8 max-w-5xl mx-auto w-full">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-6">
+      <div className="page-header flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
             <UserCog className="h-8 w-8 text-emerald-400" />
