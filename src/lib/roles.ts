@@ -20,6 +20,8 @@ export const ROUTE_PERMISSIONS: Record<string, AppRole[]> = {
   "/volunteers": MANAGER_ROLES,
   "/activities": ["owner", "admin", "staff", "volunteer"],
   "/attendance": ["owner", "admin", "staff", "volunteer"],
+  "/projects": MANAGER_ROLES,
+  "/stays": MANAGER_ROLES,
   "/settings": ADMIN_ROLES,
   "/admin/assign-roles": ADMIN_ROLES,
 };

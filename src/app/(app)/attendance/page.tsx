@@ -6,6 +6,7 @@ import { getActivitiesResultAction } from "@/app/actions/activities";
 import { getAttendanceRecordsAction, type AttendanceRecord } from "@/app/actions/attendance";
 import { requireRouteAccess } from "@/lib/auth";
 import { MANAGER_ROLES } from "@/lib/roles";
+import type { VolunteerProfileExtras } from "@/lib/domain";
 
 function pickInitialActivityId(activities: AttendanceActivity[], requested: string | undefined): string {
   if (requested && activities.some((activity) => activity._id === requested)) {
@@ -68,15 +69,21 @@ export default async function AttendancePage({
     );
   }
 
-  const volunteers: AttendanceVolunteer[] = volunteerDocs.map((volunteer) => ({
-    _id: volunteer._id,
-    firstName: volunteer.firstName,
-    lastName: volunteer.lastName,
-    email: canManage ? volunteer.email : undefined,
-    country: volunteer.country,
-    skills: volunteer.skills,
-    active: volunteer.active !== false,
-  }));
+  // VolunteerData includes VolunteerProfileExtras; the intersection keeps this page compiling either way.
+  const volunteers: AttendanceVolunteer[] = (volunteerDocs as (VolunteerData & VolunteerProfileExtras)[]).map(
+    (volunteer) => ({
+      _id: volunteer._id,
+      firstName: volunteer.firstName,
+      lastName: volunteer.lastName,
+      email: canManage ? volunteer.email : undefined,
+      country: volunteer.country,
+      skills: volunteer.skills,
+      active: volunteer.active !== false,
+      // Only managers see the weekly hours check, so only they need the volunteer's type and stage.
+      volunteerType: canManage ? volunteer.volunteerType : undefined,
+      pipelineStage: canManage ? volunteer.pipelineStage : undefined,
+    })
+  );
 
   const activities: AttendanceActivity[] = activityResult.data
     .filter((activity): activity is typeof activity & { _id: string } => Boolean(activity._id))
@@ -97,6 +104,7 @@ export default async function AttendancePage({
     activityId: record.activityId,
     status: record.status,
     checkInTime: record.checkInTime,
+    hours: record.hours,
     notes: canManage ? record.notes : undefined,
     recordedBy: canManage ? record.recordedBy : undefined,
     createdAt: record.createdAt,

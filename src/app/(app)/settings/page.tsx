@@ -43,9 +43,19 @@ async function loadSettings(): Promise<EditablePortalSettings | null> {
   }
 }
 
+/** Today's date (YYYY-MM-DD) in Morocco, used for the ESC Quality Label expiry warning. */
+function todayInMorocco(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Casablanca",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
 export default async function SettingsPage() {
   const user = await requireRouteAccess("/settings");
   const [profile, settings] = await Promise.all([loadProfile(user), loadSettings()]);
 
-  return <SettingsClient initialSettings={settings} profile={profile} />;
+  return <SettingsClient initialSettings={settings} profile={profile} today={todayInMorocco()} />;
 }

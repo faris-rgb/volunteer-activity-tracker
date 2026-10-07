@@ -11,7 +11,7 @@ export default async function AppLayout({
   return (
     <div className="min-h-full flex flex-col lg:flex-row">
       <Sidebar role={appUser.role} displayName={getDisplayName(appUser)} />
-      <main className="flex-1 flex flex-col min-w-0 overflow-y-auto bg-slate-900/50">
+      <main className="flex-1 flex flex-col min-w-0 overflow-y-auto bg-transparent">
         {children}
       </main>
     </div>

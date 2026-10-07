@@ -1,7 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // The application PDF (sent from the /join server action) embeds these fonts at runtime.
+  outputFileTracingIncludes: {
+    "/join": ["./src/assets/fonts/*.ttf"],
+  },
 };
 
 export default nextConfig;

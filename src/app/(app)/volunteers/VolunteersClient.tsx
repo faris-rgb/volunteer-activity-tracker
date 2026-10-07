@@ -1,14 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  ArrowRight,
   ChevronLeft,
   ChevronRight,
   CircleCheck,
   Clock,
   Download,
+  FolderKanban,
   Languages,
+  List,
   LoaderCircle,
   Mail,
   MapPin,
@@ -17,6 +21,7 @@ import {
   RefreshCw,
   Search,
   SearchX,
+  SquareKanban,
   SquarePen,
   Trash,
   TriangleAlert,
@@ -27,168 +32,90 @@ import {
   X,
 } from "lucide-react";
 import {
-  createVolunteerAction,
   deleteVolunteerAction,
   setVolunteerActiveAction,
-  updateVolunteerAction,
+  updateVolunteerStageAction,
   type VolunteerData,
-  type VolunteerInput,
 } from "@/app/actions/volunteers";
-import type { ActionResult } from "@/lib/actionResult";
+import {
+  ESC_RULES,
+  PIPELINE_STAGE_LABELS,
+  PIPELINE_STAGES,
+  VOLUNTEER_TYPE_LABELS,
+  VOLUNTEER_TYPES,
+  type PipelineStage,
+  type VolunteerType,
+} from "@/lib/domain";
 import { formatDateKey, toDateKey } from "@/lib/dates";
+import VolunteerFormDialog from "./VolunteerFormDialog";
+import PipelineBoard from "./PipelineBoard";
+import WhatsAppMenu from "./WhatsAppMenu";
+import { AgeBadge, MembershipBadge, StageBadge, TypeBadge } from "./VolunteerBadges";
+import {
+  DIET_LABELS,
+  MEMBERSHIP_STATE_LABELS,
+  SHORT_SOURCE_LABELS,
+  callAction,
+  fullName,
+  getAge,
+  getMembershipState,
+  hasEscAgeIssue,
+  initials,
+  plural,
+  type VolunteerPresets,
+} from "./volunteerUtils";
+
+export type VolunteerView = "list" | "pipeline";
 
 interface VolunteersClientProps {
   initialVolunteers: VolunteerData[];
   canManage: boolean;
+  /** Emergency contact details (owner, admin, staff). */
+  canViewEmergency: boolean;
+  /** Medical notes (owner, admin). */
+  canViewMedical: boolean;
   loadError?: string | null;
   defaultCountry: string;
+  presets: VolunteerPresets;
+  /** Today's date (YYYY-MM-DD) in Morocco, used for ages and membership states. */
+  today: string;
+  initialView: VolunteerView;
   openCreateOnLoad: boolean;
 }
 
 type StatusFilter = "all" | "active" | "inactive";
+type TypeFilter = "all" | VolunteerType | "unset";
+type StageFilter = "all" | "open" | PipelineStage | "unset";
+type MembershipFilter = "all" | "paid" | "attention" | "expired" | "unpaid" | "none";
 type SortOrder = "name-asc" | "name-desc" | "newest" | "oldest";
-
-interface FormState {
-  firstName: string;
-  lastName: string;
-  email: string;
-  phoneNumber: string;
-  city: string;
-  country: string;
-  skills: string;
-  languages: string;
-  notes: string;
-  active: boolean;
-}
-
-type FormErrors = Partial<Record<keyof FormState, string>>;
 
 interface Notice {
   type: "success" | "error";
   message: string;
+  link?: { href: string; label: string };
 }
 
 const PAGE_SIZE = 10;
-const MAX_LIST_ITEMS = 30;
-const MAX_NOTES_LENGTH = 2000;
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-const PHONE_PATTERN = /^\+?[\d\s().-]+$/;
-const NETWORK_ERROR = "Could not reach the server. Check your connection and try again.";
+/** Stages of applications that still need a decision or preparation. */
+const OPEN_STAGES: PipelineStage[] = ["lead", "meeting", "accepted"];
 
-const EMPTY_FORM: FormState = {
-  firstName: "",
-  lastName: "",
-  email: "",
-  phoneNumber: "",
-  city: "",
-  country: "",
-  skills: "",
-  languages: "",
-  notes: "",
-  active: true,
+const MEMBERSHIP_FILTER_LABELS: Record<MembershipFilter, string> = {
+  all: "All memberships",
+  paid: "Members · paid",
+  attention: "Expired or unpaid",
+  expired: "Expired only",
+  unpaid: "Unpaid only",
+  none: "Not a member",
 };
 
-const FIELD_ORDER: (keyof FormState)[] = ["firstName", "lastName", "email", "phoneNumber", "skills", "languages", "notes"];
-
-function inputClassName(error?: string) {
-  return `w-full bg-slate-950 border rounded-xl px-4 py-2 text-sm text-white placeholder-slate-600 focus:outline-none transition-colors ${
-    error ? "border-rose-500/60 focus:border-rose-400" : "border-slate-800 focus:border-emerald-500/50"
-  }`;
-}
-
-function fullName(vol: Pick<VolunteerData, "firstName" | "lastName">) {
-  return `${vol.firstName} ${vol.lastName}`.trim();
-}
-
-function initials(vol: Pick<VolunteerData, "firstName" | "lastName">) {
-  return `${vol.firstName.charAt(0)}${vol.lastName.charAt(0)}`.toUpperCase() || "?";
-}
-
-function plural(count: number, word: string) {
-  return `${count} ${word}${count === 1 ? "" : "s"}`;
-}
-
-function parseList(value: string): string[] {
-  const seen = new Set<string>();
-  return value
-    .split(",")
-    .map((item) => item.trim())
-    .filter((item) => {
-      const key = item.toLowerCase();
-      if (!item || seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-}
-
-function toFormState(vol: VolunteerData): FormState {
-  return {
-    firstName: vol.firstName,
-    lastName: vol.lastName,
-    email: vol.email,
-    phoneNumber: vol.phoneNumber ?? "",
-    city: vol.city ?? "",
-    country: vol.country ?? "",
-    skills: (vol.skills ?? []).join(", "),
-    languages: (vol.languages ?? []).join(", "),
-    notes: vol.notes ?? "",
-    active: vol.active,
-  };
-}
-
-function validateList(value: string, label: string): string | undefined {
-  const items = parseList(value);
-  if (items.length > MAX_LIST_ITEMS) return `Add at most ${MAX_LIST_ITEMS} ${label}.`;
-  if (items.some((item) => item.length > 50)) return `Each entry must be at most 50 characters.`;
-  return undefined;
-}
-
-function validateForm(form: FormState, volunteers: VolunteerData[], editingId: string | null): FormErrors {
-  const errors: FormErrors = {};
-  if (!form.firstName.trim()) errors.firstName = "First name is required.";
-  if (!form.lastName.trim()) errors.lastName = "Last name is required.";
-
-  const email = form.email.trim().toLowerCase();
-  if (!email) {
-    errors.email = "Email is required.";
-  } else if (!EMAIL_PATTERN.test(email)) {
-    errors.email = "Enter a valid email address.";
-  } else if (volunteers.some((vol) => vol._id !== editingId && vol.email.toLowerCase() === email)) {
-    errors.email = "A volunteer with this email address already exists.";
-  }
-
-  const phone = form.phoneNumber.trim();
-  if (phone && (!PHONE_PATTERN.test(phone) || phone.replace(/\D/g, "").length < 6)) {
-    errors.phoneNumber = "Enter a valid phone number (digits, spaces, +, -, parentheses).";
-  }
-
-  const skillsError = validateList(form.skills, "skills");
-  if (skillsError) errors.skills = skillsError;
-  const languagesError = validateList(form.languages, "languages");
-  if (languagesError) errors.languages = languagesError;
-
-  if (form.notes.trim().length > MAX_NOTES_LENGTH) {
-    errors.notes = `Notes must be at most ${MAX_NOTES_LENGTH} characters.`;
-  }
-  return errors;
-}
-
-async function callAction<R extends ActionResult<unknown>>(
-  action: () => Promise<R>
-): Promise<R | { ok: false; error: string }> {
-  try {
-    return await action();
-  } catch (error) {
-    console.error(error);
-    return { ok: false, error: NETWORK_ERROR };
-  }
-}
+const FILTER_SELECT_CLASS =
+  "w-full bg-slate-900/60 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-slate-300 focus:outline-none focus:border-emerald-500/50";
 
 /**
  * Quotes a CSV value and prefixes it with an apostrophe when a spreadsheet would otherwise
  * evaluate it as a formula (CSV injection) or, with `forceText`, convert it to a number.
  */
-function csvCell(value: string | number | undefined, { forceText = false } = {}): string {
+function csvCell(value: string | number | undefined | null, { forceText = false } = {}): string {
   let text = String(value ?? "");
   if (/^[=+\-@\t\r]/.test(text) || (forceText && text)) {
     text = `'${text}`;
@@ -196,41 +123,48 @@ function csvCell(value: string | number | undefined, { forceText = false } = {})
   return `"${text.replace(/"/g, '""')}"`;
 }
 
-function FormField({
-  id,
-  label,
-  error,
-  hint,
-  children,
-}: {
-  id: string;
-  label: string;
-  error?: string;
-  hint?: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <label htmlFor={id} className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
-        {label}
-      </label>
-      {children}
-      {error ? (
-        <p id={`${id}-error`} className="text-xs text-rose-400">
-          {error}
-        </p>
-      ) : hint ? (
-        <p className="text-xs text-slate-600">{hint}</p>
-      ) : null}
-    </div>
-  );
+/** Incoming ESC volunteer outside 18-30 who is still in (or before) their placement. */
+function needsAgeCheck(vol: VolunteerData, today: string) {
+  return vol.pipelineStage !== "withdrawn" && vol.pipelineStage !== "completed" && hasEscAgeIssue(vol, today);
+}
+
+function matchesMembership(vol: VolunteerData, filter: MembershipFilter, today: string) {
+  if (filter === "all") return true;
+  const state = getMembershipState(vol.membership, today);
+  switch (filter) {
+    case "paid":
+      return state === "active";
+    case "attention":
+      return state === "expired" || state === "unpaid";
+    default:
+      return state === filter;
+  }
+}
+
+function matchesStage(vol: VolunteerData, filter: StageFilter) {
+  if (filter === "all") return true;
+  if (filter === "open") return !!vol.pipelineStage && OPEN_STAGES.includes(vol.pipelineStage);
+  if (filter === "unset") return !vol.pipelineStage;
+  return vol.pipelineStage === filter;
+}
+
+function replaceUrlParam(key: string, value: string | null) {
+  const url = new URL(window.location.href);
+  if (value === null) url.searchParams.delete(key);
+  else url.searchParams.set(key, value);
+  window.history.replaceState(null, "", `${url.pathname}${url.search}`);
 }
 
 export default function VolunteersClient({
   initialVolunteers,
   canManage,
+  canViewEmergency,
+  canViewMedical,
   loadError,
   defaultCountry,
+  presets,
+  today,
+  initialView,
   openCreateOnLoad,
 }: VolunteersClientProps) {
   const router = useRouter();
@@ -241,18 +175,20 @@ export default function VolunteersClient({
     setVolunteers(initialVolunteers);
   }
 
+  const [view, setView] = useState<VolunteerView>(initialView);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
+  const [stageFilter, setStageFilter] = useState<StageFilter>("all");
+  const [membershipFilter, setMembershipFilter] = useState<MembershipFilter>("all");
+  const [ageIssueOnly, setAgeIssueOnly] = useState(false);
   const [sortOrder, setSortOrder] = useState<SortOrder>("name-asc");
   const [page, setPage] = useState(1);
 
-  const createForm = useMemo<FormState>(() => ({ ...EMPTY_FORM, country: defaultCountry }), [defaultCountry]);
   const [isFormOpen, setIsFormOpen] = useState(openCreateOnLoad);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<FormState>(createForm);
-  const [formErrors, setFormErrors] = useState<FormErrors>({});
-  const [formError, setFormError] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
+  /** Snapshot of the volunteer being edited (null while registering a new one). */
+  const [formVolunteer, setFormVolunteer] = useState<VolunteerData | null>(null);
+  const [formKey, setFormKey] = useState(0);
 
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -267,39 +203,33 @@ export default function VolunteersClient({
   if (openCreateOnLoad !== syncedOpenCreate) {
     setSyncedOpenCreate(openCreateOnLoad);
     if (openCreateOnLoad && !isFormOpen) {
-      setEditingId(null);
-      setForm(createForm);
-      setFormErrors({});
-      setFormError(null);
+      setFormVolunteer(null);
+      setFormKey((key) => key + 1);
       setIsFormOpen(true);
     }
   }
 
   useEffect(() => {
-    if (openCreateOnLoad) {
-      window.history.replaceState(null, "", "/volunteers");
-    }
+    if (openCreateOnLoad) replaceUrlParam("new", null);
   }, [openCreateOnLoad]);
 
   useEffect(() => {
     if (!notice) return;
-    const timer = window.setTimeout(() => setNotice(null), notice.type === "success" ? 4000 : 8000);
+    const timer = window.setTimeout(
+      () => setNotice(null),
+      notice.type === "success" && !notice.link ? 4000 : 8000
+    );
     return () => window.clearTimeout(timer);
   }, [notice]);
 
   useEffect(() => {
-    if (!isFormOpen && !deleteTarget) return;
+    if (!deleteTarget) return;
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      if (deleteTarget) {
-        if (!isDeleting) setDeleteTargetId(null);
-      } else if (!isSaving) {
-        setIsFormOpen(false);
-      }
+      if (event.key === "Escape" && !isDeleting) setDeleteTargetId(null);
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isFormOpen, deleteTarget, isSaving, isDeleting]);
+  }, [deleteTarget, isDeleting]);
 
   const upsertVolunteer = (vol: VolunteerData) => {
     setVolunteers((prev) =>
@@ -309,89 +239,49 @@ export default function VolunteersClient({
     );
   };
 
+  const setBusy = (id: string, busy: boolean) => {
+    setBusyIds((prev) => {
+      const next = new Set(prev);
+      if (busy) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
   const openCreateForm = () => {
-    setEditingId(null);
-    setForm(createForm);
-    setFormErrors({});
-    setFormError(null);
+    setFormVolunteer(null);
+    setFormKey((key) => key + 1);
     setIsFormOpen(true);
   };
 
   const openEditForm = (vol: VolunteerData) => {
-    setEditingId(vol._id);
-    setForm(toFormState(vol));
-    setFormErrors({});
-    setFormError(null);
+    setFormVolunteer(vol);
+    setFormKey((key) => key + 1);
     setIsFormOpen(true);
   };
 
-  const closeForm = () => {
-    if (!isSaving) setIsFormOpen(false);
-  };
+  const closeForm = () => setIsFormOpen(false);
 
-  const updateField = <K extends keyof FormState>(key: K, value: FormState[K]) => {
-    setForm((prev) => ({ ...prev, [key]: value }));
-    setFormErrors((prev) => (prev[key] ? { ...prev, [key]: undefined } : prev));
-  };
-
-  const handleSave = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (isSaving) return;
-
-    const errors = validateForm(form, volunteers, editingId);
-    setFormErrors(errors);
-    const firstInvalid = FIELD_ORDER.find((key) => errors[key]);
-    if (firstInvalid) {
-      setFormError(null);
-      document.getElementById(`volunteer-${firstInvalid}`)?.focus();
-      return;
-    }
-
-    const payload: VolunteerInput = {
-      firstName: form.firstName.trim(),
-      lastName: form.lastName.trim(),
-      email: form.email.trim().toLowerCase(),
-      phoneNumber: form.phoneNumber.trim(),
-      city: form.city.trim(),
-      country: form.country.trim(),
-      skills: parseList(form.skills),
-      languages: parseList(form.languages),
-      notes: form.notes.trim(),
-      active: form.active,
-    };
-
-    setFormError(null);
-    setIsSaving(true);
-    const result = await callAction(() =>
-      editingId ? updateVolunteerAction(editingId, payload) : createVolunteerAction(payload)
-    );
-    setIsSaving(false);
-
-    if (!result.ok) {
-      setFormError(result.error);
-      return;
-    }
-
-    upsertVolunteer(result.data);
+  const handleSaved = (vol: VolunteerData, created: boolean) => {
+    upsertVolunteer(vol);
     setIsFormOpen(false);
+    const ageNote = hasEscAgeIssue(vol, today)
+      ? ` Note: outside the ESC age range (${ESC_RULES.minAge}-${ESC_RULES.maxAge}).`
+      : "";
     setNotice({
       type: "success",
-      message: editingId
-        ? `Saved changes to ${fullName(result.data)}.`
-        : `${fullName(result.data)} was added to the directory.`,
+      message: created
+        ? `${fullName(vol)} was added to the directory.${ageNote}`
+        : `Saved changes to ${fullName(vol)}.${ageNote}`,
     });
   };
 
   const handleToggleActive = async (vol: VolunteerData) => {
     if (busyIds.has(vol._id)) return;
 
-    setBusyIds((prev) => new Set(prev).add(vol._id));
+    setBusy(vol._id, true);
     const result = await callAction(() => setVolunteerActiveAction(vol._id, !vol.active));
-    setBusyIds((prev) => {
-      const next = new Set(prev);
-      next.delete(vol._id);
-      return next;
-    });
+    setBusy(vol._id, false);
 
     if (!result.ok) {
       setNotice({ type: "error", message: result.error });
@@ -402,6 +292,34 @@ export default function VolunteersClient({
     setNotice({
       type: "success",
       message: `${fullName(result.data)} is now ${result.data.active ? "active" : "inactive"}.`,
+    });
+  };
+
+  const handleMoveStage = async (vol: VolunteerData, stage: PipelineStage) => {
+    if (busyIds.has(vol._id) || vol.pipelineStage === stage) return;
+
+    setBusy(vol._id, true);
+    const result = await callAction(() => updateVolunteerStageAction(vol._id, stage));
+    setBusy(vol._id, false);
+
+    if (!result.ok) {
+      setNotice({ type: "error", message: result.error });
+      return;
+    }
+
+    const moved = result.data;
+    upsertVolunteer(moved);
+    const ageNote =
+      stage === "accepted" && hasEscAgeIssue(moved, today)
+        ? ` Check eligibility: outside the ESC age range (${ESC_RULES.minAge}-${ESC_RULES.maxAge}).`
+        : "";
+    const needsStay =
+      (stage === "accepted" || stage === "arrived") &&
+      (moved.volunteerType === "incoming_esc" || moved.volunteerType === "domestic");
+    setNotice({
+      type: "success",
+      message: `${fullName(moved)} moved to ${PIPELINE_STAGE_LABELS[stage]}.${ageNote}`,
+      link: needsStay ? { href: "/stays", label: "Plan their stay" } : undefined,
     });
   };
 
@@ -452,11 +370,26 @@ export default function VolunteersClient({
     startRefresh(() => router.refresh());
   };
 
-  const filteredVolunteers = useMemo(() => {
+  const handleWhatsAppOpened = (message: string) => {
+    setNotice({ type: "success", message });
+  };
+
+  const changeView = (next: VolunteerView) => {
+    setView(next);
+    replaceUrlParam("view", next === "pipeline" ? "pipeline" : null);
+  };
+
+  /** Every filter except the stage (the pipeline view shows all stages as columns). */
+  const baseFiltered = useMemo(() => {
     const query = search.trim().toLowerCase();
     const result = volunteers.filter((vol) => {
       if (statusFilter === "active" && !vol.active) return false;
       if (statusFilter === "inactive" && vol.active) return false;
+      if (typeFilter === "unset" ? !!vol.volunteerType : typeFilter !== "all" && vol.volunteerType !== typeFilter) {
+        return false;
+      }
+      if (!matchesMembership(vol, membershipFilter, today)) return false;
+      if (ageIssueOnly && !needsAgeCheck(vol, today)) return false;
       if (!query) return true;
       return [
         fullName(vol),
@@ -464,6 +397,8 @@ export default function VolunteersClient({
         vol.phoneNumber,
         vol.city,
         vol.country,
+        vol.nationality,
+        vol.appliedProjectName,
         ...(vol.skills ?? []),
         ...(vol.languages ?? []),
       ].some((field) => field?.toLowerCase().includes(query));
@@ -477,24 +412,46 @@ export default function VolunteersClient({
     });
 
     return result;
-  }, [volunteers, search, statusFilter, sortOrder]);
+  }, [volunteers, search, statusFilter, typeFilter, membershipFilter, ageIssueOnly, sortOrder, today]);
+
+  const filteredVolunteers = useMemo(
+    () => (view === "list" ? baseFiltered.filter((vol) => matchesStage(vol, stageFilter)) : baseFiltered),
+    [baseFiltered, stageFilter, view]
+  );
 
   const stats = useMemo(() => {
-    const total = volunteers.length;
-    const activeCount = volunteers.filter((vol) => vol.active).length;
-    return { total, activeCount, inactiveCount: total - activeCount };
-  }, [volunteers]);
+    let activeCount = 0;
+    let openCount = 0;
+    let renewCount = 0;
+    let ageIssueCount = 0;
+    for (const vol of volunteers) {
+      if (vol.active) activeCount += 1;
+      if (matchesStage(vol, "open")) openCount += 1;
+      if (matchesMembership(vol, "attention", today)) renewCount += 1;
+      if (needsAgeCheck(vol, today)) ageIssueCount += 1;
+    }
+    return { total: volunteers.length, activeCount, openCount, renewCount, ageIssueCount };
+  }, [volunteers, today]);
 
   const totalPages = Math.max(1, Math.ceil(filteredVolunteers.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
   const pageStart = (currentPage - 1) * PAGE_SIZE;
   const pageVolunteers = filteredVolunteers.slice(pageStart, pageStart + PAGE_SIZE);
-  const hasFilters = search.trim() !== "" || statusFilter !== "all";
-  const columnCount = canManage ? 5 : 4;
+  const hasFilters =
+    search.trim() !== "" ||
+    statusFilter !== "all" ||
+    typeFilter !== "all" ||
+    (view === "list" && stageFilter !== "all") ||
+    membershipFilter !== "all" ||
+    ageIssueOnly;
 
   const clearFilters = () => {
     setSearch("");
     setStatusFilter("all");
+    setTypeFilter("all");
+    setStageFilter("all");
+    setMembershipFilter("all");
+    setAgeIssueOnly(false);
     setPage(1);
   };
 
@@ -508,6 +465,17 @@ export default function VolunteersClient({
       "Phone",
       "City",
       "Country",
+      "Nationality",
+      "Type",
+      "Date of Birth",
+      "Age",
+      "Pipeline Stage",
+      "Source",
+      "Applied Project",
+      "Membership",
+      "Member Since",
+      "Paid Until",
+      "Diet",
       "Status",
       "Skills",
       "Languages",
@@ -521,6 +489,17 @@ export default function VolunteersClient({
       csvCell(vol.phoneNumber, { forceText: true }),
       csvCell(vol.city),
       csvCell(vol.country),
+      csvCell(vol.nationality),
+      csvCell(vol.volunteerType ? VOLUNTEER_TYPE_LABELS[vol.volunteerType] : ""),
+      csvCell(vol.dateOfBirth),
+      csvCell(getAge(vol.dateOfBirth, today) ?? ""),
+      csvCell(vol.pipelineStage ? PIPELINE_STAGE_LABELS[vol.pipelineStage] : ""),
+      csvCell(vol.source ? SHORT_SOURCE_LABELS[vol.source] : ""),
+      csvCell(vol.appliedProjectName),
+      csvCell(MEMBERSHIP_STATE_LABELS[getMembershipState(vol.membership, today)]),
+      csvCell(vol.membership?.memberSince),
+      csvCell(vol.membership?.paidUntil),
+      csvCell(vol.diet ? DIET_LABELS[vol.diet] : ""),
       csvCell(vol.active ? "Active" : "Inactive"),
       csvCell((vol.skills ?? []).join("; ")),
       csvCell((vol.languages ?? []).join("; ")),
@@ -541,26 +520,224 @@ export default function VolunteersClient({
     setNotice({ type: "success", message: `Exported ${plural(rows.length, "volunteer")} to CSV.` });
   };
 
-  const statCards: { filter: StatusFilter; label: string; value: number; valueClass: string }[] = [
-    { filter: "all", label: "Total Registered", value: stats.total, valueClass: "text-white" },
-    { filter: "active", label: "Active", value: stats.activeCount, valueClass: "text-emerald-400" },
-    { filter: "inactive", label: "Inactive", value: stats.inactiveCount, valueClass: "text-slate-400" },
+  const statCards: {
+    key: string;
+    label: string;
+    value: number;
+    valueClass: string;
+    pressed: boolean;
+    onClick: () => void;
+  }[] = [
+    {
+      key: "total",
+      label: "Total Registered",
+      value: stats.total,
+      valueClass: "text-white",
+      pressed: !hasFilters,
+      onClick: clearFilters,
+    },
+    {
+      key: "active",
+      label: "Active",
+      value: stats.activeCount,
+      valueClass: "text-emerald-400",
+      pressed: statusFilter === "active",
+      onClick: () => {
+        setStatusFilter((prev) => (prev === "active" ? "all" : "active"));
+        setPage(1);
+      },
+    },
+    {
+      key: "open",
+      label: "Open Applications",
+      value: stats.openCount,
+      valueClass: "text-sky-300",
+      pressed: view === "list" && stageFilter === "open",
+      onClick: () => {
+        const turnOn = !(view === "list" && stageFilter === "open");
+        setStageFilter(turnOn ? "open" : "all");
+        if (turnOn) changeView("list");
+        setPage(1);
+      },
+    },
+    {
+      key: "renew",
+      label: "Membership to Renew",
+      value: stats.renewCount,
+      valueClass: stats.renewCount > 0 ? "text-amber-300" : "text-slate-400",
+      pressed: membershipFilter === "attention",
+      onClick: () => {
+        setMembershipFilter((prev) => (prev === "attention" ? "all" : "attention"));
+        setPage(1);
+      },
+    },
   ];
 
   const deleteAttendanceCount = deleteTarget?.attendanceCount ?? 0;
 
+  const renderRowActions = (vol: VolunteerData) => {
+    const name = fullName(vol);
+    const isBusy = busyIds.has(vol._id);
+    return (
+      <div className="flex items-center justify-end gap-1">
+        <WhatsAppMenu
+          firstName={vol.firstName}
+          name={name}
+          phone={vol.phoneNumber}
+          templates={presets.whatsappTemplates}
+          organizationName={presets.organizationName}
+          onOpened={handleWhatsAppOpened}
+        />
+        {canManage && (
+          <>
+            <button
+              type="button"
+              onClick={() => handleToggleActive(vol)}
+              disabled={isBusy}
+              className={`p-1.5 rounded-lg text-slate-400 hover:bg-slate-900 disabled:opacity-50 transition-colors ${
+                vol.active ? "hover:text-amber-400" : "hover:text-emerald-400"
+              }`}
+              title={vol.active ? "Deactivate" : "Activate"}
+              aria-label={`${vol.active ? "Deactivate" : "Activate"} ${name}`}
+            >
+              {isBusy ? (
+                <LoaderCircle className="h-4 w-4 animate-spin" />
+              ) : vol.active ? (
+                <UserX className="h-4 w-4" />
+              ) : (
+                <UserCheck className="h-4 w-4" />
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => openEditForm(vol)}
+              disabled={isBusy}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-900 disabled:opacity-50 transition-colors"
+              title="Edit"
+              aria-label={`Edit ${name}`}
+            >
+              <SquarePen className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => openDeleteDialog(vol)}
+              disabled={isBusy}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-900 disabled:opacity-50 transition-colors"
+              title="Delete"
+              aria-label={`Delete ${name}`}
+            >
+              <Trash className="h-4 w-4" />
+            </button>
+          </>
+        )}
+      </div>
+    );
+  };
+
+  const activeBadge = (vol: VolunteerData) => (
+    <span
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${
+        vol.active
+          ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
+          : "text-slate-400 bg-slate-800 border-slate-700/50"
+      }`}
+    >
+      {vol.active ? <CircleCheck className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
+      {vol.active ? "Active" : "Inactive"}
+    </span>
+  );
+
+  const contactLinks = (vol: VolunteerData) => (
+    <div className="flex items-center gap-x-3 gap-y-0.5 flex-wrap text-slate-500 text-xs mt-0.5 min-w-0">
+      {vol.email && (
+        <a
+          href={`mailto:${vol.email}`}
+          className="flex items-center gap-1 hover:text-emerald-400 transition-colors min-w-0"
+        >
+          <Mail className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate">{vol.email}</span>
+        </a>
+      )}
+      {vol.phoneNumber && (
+        <a
+          href={`tel:${vol.phoneNumber.replace(/[^\d+]/g, "")}`}
+          className="flex items-center gap-1 hover:text-emerald-400 transition-colors"
+        >
+          <Phone className="h-3.5 w-3.5 shrink-0" />
+          {vol.phoneNumber}
+        </a>
+      )}
+    </div>
+  );
+
+  const emptyDirectory = (
+    <div className="px-6 py-16 text-center">
+      <div className="h-14 w-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mx-auto">
+        <UserPlus className="h-7 w-7" />
+      </div>
+      <h2 className="mt-5 text-lg font-bold text-white">
+        {loadError ? "Volunteer data is unavailable" : "No volunteers yet"}
+      </h2>
+      <p className="mt-2 text-sm text-slate-400 max-w-md mx-auto">
+        {loadError
+          ? "The directory could not be loaded right now. Retry once the connection is restored."
+          : canManage
+            ? "Register your first volunteer, or share the join page so applicants land here as “Applied” in the pipeline."
+            : "Volunteers registered by your team will appear here."}
+      </p>
+      {loadError ? (
+        <button
+          type="button"
+          onClick={handleRetry}
+          disabled={isRefreshing}
+          className="mt-6 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-white disabled:opacity-50 transition-colors"
+        >
+          <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+          {isRefreshing ? "Retrying..." : "Retry"}
+        </button>
+      ) : (
+        canManage && (
+          <button
+            type="button"
+            onClick={openCreateForm}
+            className="mt-6 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-emerald-500 text-slate-950 hover:bg-emerald-400 shadow-md shadow-emerald-500/20 transition-all duration-200"
+          >
+            <Plus className="h-4 w-4" />
+            Add your first volunteer
+          </button>
+        )
+      )}
+    </div>
+  );
+
+  const noMatches = (
+    <div className="py-12 px-6 text-center">
+      <SearchX className="h-8 w-8 text-slate-600 mx-auto" />
+      <p className="mt-3 text-sm text-slate-400">No volunteers match your search or filters.</p>
+      <button
+        type="button"
+        onClick={clearFilters}
+        className="mt-4 px-4 py-2 rounded-xl text-sm font-semibold border border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
+      >
+        Clear filters
+      </button>
+    </div>
+  );
+
   return (
-    <div className="flex-1 p-6 md:p-8 space-y-8 max-w-7xl mx-auto w-full">
+    <div className="flex-1 p-4 sm:p-6 md:p-8 space-y-6 sm:space-y-8 max-w-7xl mx-auto w-full min-w-0">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-6">
-        <div>
-          <h1 className="text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
-            <Users className="h-8 w-8 text-emerald-400" />
+        <div className="min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
+            <Users className="h-7 w-7 sm:h-8 sm:w-8 text-emerald-400 shrink-0" />
             Volunteer Directory
           </h1>
-          <p className="text-slate-400 mt-1">Manage registration details, contributions, and active status.</p>
+          <p className="text-slate-400 mt-1 text-sm sm:text-base">
+            Applications, profiles, memberships and contact details in one place.
+          </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <button
             type="button"
             onClick={handleExport}
@@ -606,57 +783,112 @@ export default function VolunteersClient({
       )}
 
       {/* Summary Metrics (click to filter) */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {statCards.map((card) => {
-          const selected = statusFilter === card.filter;
-          return (
-            <button
-              key={card.filter}
-              type="button"
-              aria-pressed={selected}
-              onClick={() => {
-                setStatusFilter(card.filter);
-                setPage(1);
-              }}
-              className={`text-left bg-slate-950/40 border rounded-xl p-4 transition-colors ${
-                selected ? "border-emerald-500/40" : "border-slate-900 hover:border-slate-800"
-              }`}
-            >
-              <span className="text-xs text-slate-500 uppercase tracking-wider block font-semibold">{card.label}</span>
-              <span className={`text-2xl font-bold block mt-1 ${card.valueClass}`}>{card.value}</span>
-            </button>
-          );
-        })}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        {statCards.map((card) => (
+          <button
+            key={card.key}
+            type="button"
+            aria-pressed={card.pressed}
+            onClick={card.onClick}
+            className={`text-left bg-slate-950/40 border rounded-xl p-4 transition-colors ${
+              card.pressed ? "border-emerald-500/40" : "border-slate-900 hover:border-slate-800"
+            }`}
+          >
+            <span className="text-[11px] sm:text-xs text-slate-500 uppercase tracking-wider block font-semibold">
+              {card.label}
+            </span>
+            <span className={`text-2xl font-bold block mt-1 ${card.valueClass}`}>{card.value}</span>
+          </button>
+        ))}
       </div>
 
-      {/* Filters bar */}
-      <div className="bg-slate-950/40 border border-slate-900 rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between gap-4">
-        <div className="relative w-full md:max-w-md">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-500 pointer-events-none" />
-          <input
-            type="search"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
+      {stats.ageIssueCount > 0 && !ageIssueOnly && (
+        <div
+          role="status"
+          className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-200"
+        >
+          <span className="flex items-start gap-2">
+            <TriangleAlert className="h-4 w-4 mt-0.5 shrink-0 text-amber-300" />
+            {stats.ageIssueCount === 1
+              ? "1 international (ESC) volunteer is"
+              : `${stats.ageIssueCount} international (ESC) volunteers are`}{" "}
+            outside the ESC age range of {ESC_RULES.minAge}-{ESC_RULES.maxAge}.
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setAgeIssueOnly(true);
               setPage(1);
             }}
-            placeholder="Search by name, email, location, skill, or language..."
-            aria-label="Search volunteers"
-            className="w-full pl-11 pr-4 py-2.5 bg-slate-900/60 border border-slate-800 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500/50 transition-colors"
-          />
+            className="shrink-0 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-amber-500/30 text-amber-200 hover:bg-amber-500/20 transition-colors"
+          >
+            Show them
+            <ArrowRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* Filters bar */}
+      <div className="bg-slate-950/40 border border-slate-900 rounded-2xl p-4 space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="relative flex-1 min-w-0">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-500 pointer-events-none" />
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              placeholder="Search by name, email, nationality, skill, language..."
+              aria-label="Search volunteers"
+              className="w-full pl-11 pr-4 py-2.5 bg-slate-900/60 border border-slate-800 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500/50 transition-colors"
+            />
+          </div>
+
+          <div className="flex items-center justify-between sm:justify-end gap-2">
+            {hasFilters && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-900 transition-colors"
+              >
+                <X className="h-4 w-4" />
+                Clear filters
+              </button>
+            )}
+            <div
+              className="bg-slate-900 border border-slate-800 rounded-xl p-0.5 flex items-center ml-auto sm:ml-0"
+              role="group"
+              aria-label="View"
+            >
+              <button
+                type="button"
+                onClick={() => changeView("list")}
+                aria-pressed={view === "list"}
+                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                  view === "list" ? "bg-emerald-500 text-slate-950" : "text-slate-400 hover:text-white"
+                }`}
+              >
+                <List className="h-4 w-4" aria-hidden="true" />
+                List
+              </button>
+              <button
+                type="button"
+                onClick={() => changeView("pipeline")}
+                aria-pressed={view === "pipeline"}
+                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                  view === "pipeline" ? "bg-emerald-500 text-slate-950" : "text-slate-400 hover:text-white"
+                }`}
+              >
+                <SquareKanban className="h-4 w-4" aria-hidden="true" />
+                Pipeline
+              </button>
+            </div>
+          </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
-          {hasFilters && (
-            <button
-              type="button"
-              onClick={clearFilters}
-              className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-900 transition-colors"
-            >
-              <X className="h-4 w-4" />
-              Clear filters
-            </button>
-          )}
+        <div className={`grid grid-cols-2 gap-3 ${view === "list" ? "md:grid-cols-5" : "md:grid-cols-4"}`}>
           <select
             value={statusFilter}
             onChange={(e) => {
@@ -664,11 +896,66 @@ export default function VolunteersClient({
               setPage(1);
             }}
             aria-label="Filter by status"
-            className="bg-slate-900/60 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-300 focus:outline-none focus:border-emerald-500/50 min-w-[140px]"
+            className={FILTER_SELECT_CLASS}
           >
-            <option value="all">All Statuses</option>
-            <option value="active">Active Only</option>
-            <option value="inactive">Inactive Only</option>
+            <option value="all">All statuses</option>
+            <option value="active">Active only</option>
+            <option value="inactive">Inactive only</option>
+          </select>
+
+          <select
+            value={typeFilter}
+            onChange={(e) => {
+              setTypeFilter(e.target.value as TypeFilter);
+              setPage(1);
+            }}
+            aria-label="Filter by volunteer type"
+            className={FILTER_SELECT_CLASS}
+          >
+            <option value="all">All types</option>
+            {VOLUNTEER_TYPES.map((type) => (
+              <option key={type} value={type}>
+                {VOLUNTEER_TYPE_LABELS[type]}
+              </option>
+            ))}
+            <option value="unset">Type not set</option>
+          </select>
+
+          {view === "list" && (
+            <select
+              value={stageFilter}
+              onChange={(e) => {
+                setStageFilter(e.target.value as StageFilter);
+                setPage(1);
+              }}
+              aria-label="Filter by pipeline stage"
+              className={FILTER_SELECT_CLASS}
+            >
+              <option value="all">All stages</option>
+              <option value="open">Open applications</option>
+              {PIPELINE_STAGES.map((stage) => (
+                <option key={stage} value={stage}>
+                  {PIPELINE_STAGE_LABELS[stage]}
+                </option>
+              ))}
+              <option value="unset">No stage</option>
+            </select>
+          )}
+
+          <select
+            value={membershipFilter}
+            onChange={(e) => {
+              setMembershipFilter(e.target.value as MembershipFilter);
+              setPage(1);
+            }}
+            aria-label="Filter by membership"
+            className={FILTER_SELECT_CLASS}
+          >
+            {(Object.keys(MEMBERSHIP_FILTER_LABELS) as MembershipFilter[]).map((key) => (
+              <option key={key} value={key}>
+                {MEMBERSHIP_FILTER_LABELS[key]}
+              </option>
+            ))}
           </select>
 
           <select
@@ -678,7 +965,7 @@ export default function VolunteersClient({
               setPage(1);
             }}
             aria-label="Sort volunteers"
-            className="bg-slate-900/60 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-300 focus:outline-none focus:border-emerald-500/50 min-w-[160px]"
+            className={FILTER_SELECT_CLASS}
           >
             <option value="name-asc">Name: A to Z</option>
             <option value="name-desc">Name: Z to A</option>
@@ -686,152 +973,164 @@ export default function VolunteersClient({
             <option value="oldest">Oldest first</option>
           </select>
         </div>
-      </div>
 
-      {/* Table Container */}
-      <div className="bg-slate-950/40 border border-slate-900 rounded-2xl overflow-hidden">
-        {volunteers.length === 0 ? (
-          <div className="px-6 py-16 text-center">
-            <div className="h-14 w-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mx-auto">
-              <UserPlus className="h-7 w-7" />
-            </div>
-            <h2 className="mt-5 text-lg font-bold text-white">
-              {loadError ? "Volunteer data is unavailable" : "No volunteers yet"}
-            </h2>
-            <p className="mt-2 text-sm text-slate-400 max-w-md mx-auto">
-              {loadError
-                ? "The directory could not be loaded right now. Retry once the connection is restored."
-                : canManage
-                  ? "Register your first volunteer to start planning activities and tracking attendance."
-                  : "Volunteers registered by your team will appear here."}
-            </p>
-            {loadError ? (
+        {ageIssueOnly && (
+          <div className="flex flex-wrap gap-2">
+            <span className="inline-flex items-center gap-1.5 pl-3 pr-1 py-1 rounded-full text-xs font-semibold border border-amber-500/30 bg-amber-500/10 text-amber-200">
+              <TriangleAlert className="h-3.5 w-3.5" aria-hidden="true" />
+              Outside ESC age {ESC_RULES.minAge}-{ESC_RULES.maxAge}
               <button
                 type="button"
-                onClick={handleRetry}
-                disabled={isRefreshing}
-                className="mt-6 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-white disabled:opacity-50 transition-colors"
+                onClick={() => {
+                  setAgeIssueOnly(false);
+                  setPage(1);
+                }}
+                aria-label="Remove the ESC age filter"
+                className="p-0.5 rounded-full hover:bg-amber-500/20 hover:text-white transition-colors"
               >
-                <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
-                {isRefreshing ? "Retrying..." : "Retry"}
+                <X className="h-3.5 w-3.5" />
               </button>
-            ) : (
-              canManage && (
-                <button
-                  type="button"
-                  onClick={openCreateForm}
-                  className="mt-6 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-emerald-500 text-slate-950 hover:bg-emerald-400 shadow-md shadow-emerald-500/20 transition-all duration-200"
-                >
-                  <Plus className="h-4 w-4" />
-                  Add your first volunteer
-                </button>
-              )
-            )}
+            </span>
           </div>
+        )}
+      </div>
+
+      {/* Directory */}
+      {view === "pipeline" ? (
+        volunteers.length === 0 ? (
+          <div className="bg-slate-950/40 border border-slate-900 rounded-2xl overflow-hidden">{emptyDirectory}</div>
+        ) : filteredVolunteers.length === 0 ? (
+          <div className="bg-slate-950/40 border border-slate-900 rounded-2xl overflow-hidden">{noMatches}</div>
         ) : (
-          <>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-slate-900/80 text-xs font-semibold text-slate-400 uppercase bg-slate-950/20">
-                    <th className="py-4 px-6">Volunteer</th>
-                    <th className="py-4 px-6">Location</th>
-                    <th className="py-4 px-6">Status</th>
-                    <th className="py-4 px-6">Skills / Langs</th>
-                    {canManage && <th className="py-4 px-6 text-right">Actions</th>}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-900/40">
-                  {pageVolunteers.length === 0 ? (
-                    <tr>
-                      <td colSpan={columnCount} className="py-12 text-center">
-                        <SearchX className="h-8 w-8 text-slate-600 mx-auto" />
-                        <p className="mt-3 text-sm text-slate-400">No volunteers match your search or filters.</p>
-                        <button
-                          type="button"
-                          onClick={clearFilters}
-                          className="mt-4 px-4 py-2 rounded-xl text-sm font-semibold border border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
-                        >
-                          Clear filters
-                        </button>
-                      </td>
+          <div className="space-y-3">
+            <p className="text-xs text-slate-500">
+              {canManage
+                ? "Use “Next” or the stage menu on a card to move a volunteer through the application process."
+                : "Where each volunteer is in the application process."}
+            </p>
+            <PipelineBoard
+              volunteers={filteredVolunteers}
+              today={today}
+              canManage={canManage}
+              busyIds={busyIds}
+              presets={presets}
+              onMove={handleMoveStage}
+              onEdit={openEditForm}
+              onWhatsAppOpened={handleWhatsAppOpened}
+            />
+          </div>
+        )
+      ) : (
+        <div className="bg-slate-950/40 border border-slate-900 rounded-2xl overflow-hidden">
+          {volunteers.length === 0 ? (
+            emptyDirectory
+          ) : (
+            <>
+              {/* Phone layout: one card per volunteer */}
+              <ul className="md:hidden divide-y divide-slate-900/60" aria-label="Volunteers">
+                {pageVolunteers.length === 0 ? (
+                  <li>{noMatches}</li>
+                ) : (
+                  pageVolunteers.map((vol) => (
+                    <li key={vol._id} className={`p-4 space-y-3 ${busyIds.has(vol._id) ? "opacity-70" : ""}`}>
+                      <div className="flex items-start gap-3">
+                        <div className="h-10 w-10 shrink-0 rounded-xl flex items-center justify-center font-bold border text-sm bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
+                          {initials(vol)}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="font-bold text-white text-sm truncate">{fullName(vol)}</div>
+                          {contactLinks(vol)}
+                        </div>
+                        <div className="shrink-0 -mr-1.5 -mt-1">{renderRowActions(vol)}</div>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {!vol.active && activeBadge(vol)}
+                        <StageBadge stage={vol.pipelineStage} />
+                        <TypeBadge type={vol.volunteerType} />
+                        <AgeBadge dateOfBirth={vol.dateOfBirth} volunteerType={vol.volunteerType} today={today} />
+                        <MembershipBadge membership={vol.membership} today={today} />
+                      </div>
+                      {(vol.city || vol.country || vol.nationality) && (
+                        <p className="flex items-center gap-1.5 text-xs text-slate-400">
+                          <MapPin className="h-3.5 w-3.5 text-slate-500 shrink-0" />
+                          {[[vol.city, vol.country].filter(Boolean).join(", "), vol.nationality]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </p>
+                      )}
+                    </li>
+                  ))
+                )}
+              </ul>
+
+              {/* Tablet / desktop layout */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-900/80 text-xs font-semibold text-slate-400 uppercase bg-slate-950/20">
+                      <th scope="col" className="py-4 px-5">Volunteer</th>
+                      <th scope="col" className="py-4 px-5">Profile</th>
+                      <th scope="col" className="py-4 px-5">Application</th>
+                      <th scope="col" className="py-4 px-5">Membership</th>
+                      <th scope="col" className="py-4 px-5">Status</th>
+                      <th scope="col" className="py-4 px-5 text-right">
+                        Actions
+                      </th>
                     </tr>
-                  ) : (
-                    pageVolunteers.map((vol) => {
-                      const name = fullName(vol);
-                      const isBusy = busyIds.has(vol._id);
-                      return (
-                        <tr key={vol._id} className="hover:bg-slate-950/20 transition-colors group">
-                          <td className="py-4 px-6">
-                            <div className="flex items-center gap-3">
-                              <div className="h-10 w-10 shrink-0 rounded-xl flex items-center justify-center font-bold border text-sm bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
-                                {initials(vol)}
-                              </div>
-                              <div className="min-w-0">
-                                <div className="font-bold text-white group-hover:text-emerald-400 transition-colors text-sm">
-                                  {name}
+                  </thead>
+                  <tbody className="divide-y divide-slate-900/40">
+                    {pageVolunteers.length === 0 ? (
+                      <tr>
+                        <td colSpan={6}>{noMatches}</td>
+                      </tr>
+                    ) : (
+                      pageVolunteers.map((vol) => {
+                        const skills = vol.skills ?? [];
+                        return (
+                          <tr
+                            key={vol._id}
+                            className={`hover:bg-slate-950/20 transition-colors group align-top ${
+                              busyIds.has(vol._id) ? "opacity-70" : ""
+                            }`}
+                          >
+                            <td className="py-4 px-5 max-w-[19rem]">
+                              <div className="flex items-start gap-3">
+                                <div className="h-10 w-10 shrink-0 rounded-xl flex items-center justify-center font-bold border text-sm bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
+                                  {initials(vol)}
                                 </div>
-                                <div className="flex items-center gap-x-3 gap-y-0.5 flex-wrap text-slate-500 text-xs mt-0.5">
-                                  {vol.email && (
-                                    <a
-                                      href={`mailto:${vol.email}`}
-                                      className="flex items-center gap-1 hover:text-emerald-400 transition-colors"
-                                    >
-                                      <Mail className="h-3.5 w-3.5" />
-                                      {vol.email}
-                                    </a>
-                                  )}
-                                  {vol.phoneNumber && (
-                                    <a
-                                      href={`tel:${vol.phoneNumber.replace(/[^\d+]/g, "")}`}
-                                      className="flex items-center gap-1 hover:text-emerald-400 transition-colors"
-                                    >
-                                      <Phone className="h-3.5 w-3.5" />
-                                      {vol.phoneNumber}
-                                    </a>
+                                <div className="min-w-0">
+                                  <div className="font-bold text-white group-hover:text-emerald-400 transition-colors text-sm">
+                                    {fullName(vol)}
+                                  </div>
+                                  {contactLinks(vol)}
+                                  {(vol.volunteerType || vol.dateOfBirth) && (
+                                    <div className="flex flex-wrap gap-1 mt-1.5">
+                                      <TypeBadge type={vol.volunteerType} />
+                                      <AgeBadge
+                                        dateOfBirth={vol.dateOfBirth}
+                                        volunteerType={vol.volunteerType}
+                                        today={today}
+                                      />
+                                    </div>
                                   )}
                                 </div>
                               </div>
-                            </div>
-                          </td>
+                            </td>
 
-                          <td className="py-4 px-6 text-slate-400 text-sm">
-                            {vol.city || vol.country ? (
-                              <span className="flex items-center gap-1.5">
-                                <MapPin className="h-3.5 w-3.5 text-slate-500 shrink-0" />
-                                {[vol.city, vol.country].filter(Boolean).join(", ")}
-                              </span>
-                            ) : (
-                              <span className="text-slate-600">—</span>
-                            )}
-                          </td>
-
-                          <td className="py-4 px-6">
-                            <span
-                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${
-                                vol.active
-                                  ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
-                                  : "text-slate-400 bg-slate-800 border-slate-700/50"
-                              }`}
-                            >
-                              {vol.active ? <CircleCheck className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
-                              {vol.active ? "Active" : "Inactive"}
-                            </span>
-                            {vol.attendanceCount !== undefined && (
-                              <span className="block text-[11px] text-slate-500 mt-1">
-                                {plural(vol.attendanceCount, "attendance record")}
-                              </span>
-                            )}
-                          </td>
-
-                          <td className="py-4 px-6 max-w-xs">
-                            {(vol.skills?.length ?? 0) === 0 && (vol.languages?.length ?? 0) === 0 ? (
-                              <span className="text-slate-600 text-sm">—</span>
-                            ) : (
-                              <div className="space-y-1">
-                                {vol.skills && vol.skills.length > 0 && (
+                            <td className="py-4 px-5 text-sm max-w-[16rem]">
+                              <div className="space-y-1.5">
+                                {vol.city || vol.country ? (
+                                  <span className="flex items-center gap-1.5 text-slate-400">
+                                    <MapPin className="h-3.5 w-3.5 text-slate-500 shrink-0" />
+                                    {[vol.city, vol.country].filter(Boolean).join(", ")}
+                                  </span>
+                                ) : null}
+                                {vol.nationality && (
+                                  <span className="block text-xs text-slate-500">{vol.nationality}</span>
+                                )}
+                                {skills.length > 0 && (
                                   <div className="flex flex-wrap gap-1">
-                                    {vol.skills.map((skill) => (
+                                    {skills.slice(0, 3).map((skill) => (
                                       <span
                                         key={skill}
                                         className="text-[10px] bg-slate-900 border border-slate-800 text-slate-400 px-1.5 py-0.5 rounded"
@@ -839,323 +1138,121 @@ export default function VolunteersClient({
                                         {skill}
                                       </span>
                                     ))}
+                                    {skills.length > 3 && (
+                                      <span
+                                        className="text-[10px] text-slate-500 px-1 py-0.5"
+                                        title={skills.slice(3).join(", ")}
+                                      >
+                                        +{skills.length - 3} more
+                                      </span>
+                                    )}
                                   </div>
                                 )}
                                 {vol.languages && vol.languages.length > 0 && (
                                   <div className="flex items-center gap-1 text-[10px] text-slate-500">
-                                    <Languages className="h-3 w-3 text-slate-600" />
+                                    <Languages className="h-3 w-3 text-slate-600 shrink-0" />
                                     <span>{vol.languages.join(", ")}</span>
                                   </div>
                                 )}
-                              </div>
-                            )}
-                          </td>
-
-                          {canManage && (
-                            <td className="py-4 px-6 text-right">
-                              <div className="flex items-center justify-end gap-1">
-                                <button
-                                  type="button"
-                                  onClick={() => handleToggleActive(vol)}
-                                  disabled={isBusy}
-                                  className={`p-1.5 rounded-lg text-slate-400 hover:bg-slate-900 disabled:opacity-50 transition-colors ${
-                                    vol.active ? "hover:text-amber-400" : "hover:text-emerald-400"
-                                  }`}
-                                  title={vol.active ? "Deactivate" : "Activate"}
-                                  aria-label={`${vol.active ? "Deactivate" : "Activate"} ${name}`}
-                                >
-                                  {isBusy ? (
-                                    <LoaderCircle className="h-4 w-4 animate-spin" />
-                                  ) : vol.active ? (
-                                    <UserX className="h-4 w-4" />
-                                  ) : (
-                                    <UserCheck className="h-4 w-4" />
-                                  )}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => openEditForm(vol)}
-                                  disabled={isBusy}
-                                  className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-900 disabled:opacity-50 transition-colors"
-                                  title="Edit"
-                                  aria-label={`Edit ${name}`}
-                                >
-                                  <SquarePen className="h-4 w-4" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => openDeleteDialog(vol)}
-                                  disabled={isBusy}
-                                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-900 disabled:opacity-50 transition-colors"
-                                  title="Delete"
-                                  aria-label={`Delete ${name}`}
-                                >
-                                  <Trash className="h-4 w-4" />
-                                </button>
+                                {!vol.city && !vol.country && !vol.nationality && skills.length === 0 &&
+                                  (vol.languages?.length ?? 0) === 0 && <span className="text-slate-600">—</span>}
                               </div>
                             </td>
-                          )}
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
 
-            {filteredVolunteers.length > 0 && (
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-6 py-4 border-t border-slate-900/80 text-sm text-slate-500">
-                <span>
-                  Showing <span className="text-slate-300 font-semibold">{pageStart + 1}</span>–
-                  <span className="text-slate-300 font-semibold">{pageStart + pageVolunteers.length}</span> of{" "}
-                  <span className="text-slate-300 font-semibold">{filteredVolunteers.length}</span>
-                  {hasFilters && ` (filtered from ${volunteers.length})`}
-                </span>
-                {totalPages > 1 && (
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setPage(currentPage - 1)}
-                      disabled={currentPage === 1}
-                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-white disabled:opacity-40 disabled:pointer-events-none transition-colors"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                      Previous
-                    </button>
-                    <span className="px-2 text-slate-400">
-                      Page {currentPage} of {totalPages}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setPage(currentPage + 1)}
-                      disabled={currentPage === totalPages}
-                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-white disabled:opacity-40 disabled:pointer-events-none transition-colors"
-                    >
-                      Next
-                      <ChevronRight className="h-4 w-4" />
-                    </button>
-                  </div>
-                )}
+                            <td className="py-4 px-5">
+                              <StageBadge stage={vol.pipelineStage} />
+                              {vol.source && (
+                                <span className="block text-[11px] text-slate-500 mt-1">
+                                  via {SHORT_SOURCE_LABELS[vol.source]}
+                                </span>
+                              )}
+                              {vol.appliedProjectName && (
+                                <span
+                                  className="flex items-center gap-1 text-[11px] text-slate-400 mt-1 max-w-[12rem] truncate"
+                                  title={vol.appliedProjectName}
+                                >
+                                  <FolderKanban className="h-3 w-3 shrink-0 text-slate-500" aria-hidden="true" />
+                                  {vol.appliedProjectName}
+                                </span>
+                              )}
+                            </td>
+
+                            <td className="py-4 px-5">
+                              <MembershipBadge membership={vol.membership} today={today} showNone />
+                            </td>
+
+                            <td className="py-4 px-5">
+                              {activeBadge(vol)}
+                              {vol.attendanceCount !== undefined && (
+                                <span className="block text-[11px] text-slate-500 mt-1">
+                                  {plural(vol.attendanceCount, "attendance record")}
+                                </span>
+                              )}
+                            </td>
+
+                            <td className="py-4 px-5 text-right">{renderRowActions(vol)}</td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
               </div>
-            )}
-          </>
-        )}
-      </div>
+
+              {filteredVolunteers.length > 0 && (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 sm:px-6 py-4 border-t border-slate-900/80 text-sm text-slate-500">
+                  <span>
+                    Showing <span className="text-slate-300 font-semibold">{pageStart + 1}</span>–
+                    <span className="text-slate-300 font-semibold">{pageStart + pageVolunteers.length}</span> of{" "}
+                    <span className="text-slate-300 font-semibold">{filteredVolunteers.length}</span>
+                    {hasFilters && ` (filtered from ${volunteers.length})`}
+                  </span>
+                  {totalPages > 1 && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setPage(currentPage - 1)}
+                        disabled={currentPage === 1}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-white disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                        Previous
+                      </button>
+                      <span className="px-2 text-slate-400">
+                        Page {currentPage} of {totalPages}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setPage(currentPage + 1)}
+                        disabled={currentPage === totalPages}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-white disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                      >
+                        Next
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
       {/* Add/Edit Dialog */}
       {isFormOpen && canManage && (
-        <div
-          className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) closeForm();
-          }}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="volunteer-form-title"
-            className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200"
-          >
-            <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-950/40">
-              <h3 id="volunteer-form-title" className="text-lg font-bold text-white">
-                {editingId ? "Edit Volunteer Profile" : "Register New Volunteer"}
-              </h3>
-              <button
-                type="button"
-                onClick={closeForm}
-                disabled={isSaving}
-                aria-label="Close"
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-50 transition-colors"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSave} noValidate className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
-              {formError && (
-                <div
-                  role="alert"
-                  className="flex items-start gap-2 rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-300"
-                >
-                  <TriangleAlert className="h-4 w-4 mt-0.5 shrink-0" />
-                  {formError}
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <FormField id="volunteer-firstName" label="First Name *" error={formErrors.firstName}>
-                  <input
-                    id="volunteer-firstName"
-                    type="text"
-                    autoFocus
-                    autoComplete="given-name"
-                    maxLength={80}
-                    value={form.firstName}
-                    onChange={(e) => updateField("firstName", e.target.value)}
-                    aria-invalid={!!formErrors.firstName}
-                    aria-describedby={formErrors.firstName ? "volunteer-firstName-error" : undefined}
-                    className={inputClassName(formErrors.firstName)}
-                  />
-                </FormField>
-                <FormField id="volunteer-lastName" label="Last Name *" error={formErrors.lastName}>
-                  <input
-                    id="volunteer-lastName"
-                    type="text"
-                    autoComplete="family-name"
-                    maxLength={80}
-                    value={form.lastName}
-                    onChange={(e) => updateField("lastName", e.target.value)}
-                    aria-invalid={!!formErrors.lastName}
-                    aria-describedby={formErrors.lastName ? "volunteer-lastName-error" : undefined}
-                    className={inputClassName(formErrors.lastName)}
-                  />
-                </FormField>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <FormField id="volunteer-email" label="Email Address *" error={formErrors.email}>
-                  <input
-                    id="volunteer-email"
-                    type="email"
-                    autoComplete="email"
-                    maxLength={254}
-                    value={form.email}
-                    onChange={(e) => updateField("email", e.target.value)}
-                    aria-invalid={!!formErrors.email}
-                    aria-describedby={formErrors.email ? "volunteer-email-error" : undefined}
-                    className={inputClassName(formErrors.email)}
-                  />
-                </FormField>
-                <FormField id="volunteer-phoneNumber" label="Phone Number" error={formErrors.phoneNumber}>
-                  <input
-                    id="volunteer-phoneNumber"
-                    type="tel"
-                    autoComplete="tel"
-                    maxLength={30}
-                    value={form.phoneNumber}
-                    onChange={(e) => updateField("phoneNumber", e.target.value)}
-                    placeholder="e.g. +31 6 1234 5678"
-                    aria-invalid={!!formErrors.phoneNumber}
-                    aria-describedby={formErrors.phoneNumber ? "volunteer-phoneNumber-error" : undefined}
-                    className={inputClassName(formErrors.phoneNumber)}
-                  />
-                </FormField>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <FormField id="volunteer-city" label="City">
-                  <input
-                    id="volunteer-city"
-                    type="text"
-                    autoComplete="address-level2"
-                    maxLength={80}
-                    value={form.city}
-                    onChange={(e) => updateField("city", e.target.value)}
-                    className={inputClassName()}
-                  />
-                </FormField>
-                <FormField id="volunteer-country" label="Country">
-                  <input
-                    id="volunteer-country"
-                    type="text"
-                    autoComplete="country-name"
-                    maxLength={80}
-                    value={form.country}
-                    onChange={(e) => updateField("country", e.target.value)}
-                    className={inputClassName()}
-                  />
-                </FormField>
-              </div>
-
-              <FormField
-                id="volunteer-skills"
-                label="Skills (comma separated)"
-                error={formErrors.skills}
-                hint="Separate multiple skills with commas."
-              >
-                <input
-                  id="volunteer-skills"
-                  type="text"
-                  value={form.skills}
-                  onChange={(e) => updateField("skills", e.target.value)}
-                  placeholder="e.g. Teaching, Event Planning, Social Media"
-                  aria-invalid={!!formErrors.skills}
-                  aria-describedby={formErrors.skills ? "volunteer-skills-error" : undefined}
-                  className={inputClassName(formErrors.skills)}
-                />
-              </FormField>
-
-              <FormField id="volunteer-languages" label="Languages (comma separated)" error={formErrors.languages}>
-                <input
-                  id="volunteer-languages"
-                  type="text"
-                  value={form.languages}
-                  onChange={(e) => updateField("languages", e.target.value)}
-                  placeholder="e.g. English, Spanish"
-                  aria-invalid={!!formErrors.languages}
-                  aria-describedby={formErrors.languages ? "volunteer-languages-error" : undefined}
-                  className={inputClassName(formErrors.languages)}
-                />
-              </FormField>
-
-              <FormField
-                id="volunteer-notes"
-                label="Notes"
-                error={formErrors.notes}
-                hint={`${form.notes.length}/${MAX_NOTES_LENGTH} characters`}
-              >
-                <textarea
-                  id="volunteer-notes"
-                  value={form.notes}
-                  onChange={(e) => updateField("notes", e.target.value)}
-                  rows={3}
-                  maxLength={MAX_NOTES_LENGTH}
-                  aria-invalid={!!formErrors.notes}
-                  aria-describedby={formErrors.notes ? "volunteer-notes-error" : undefined}
-                  className={`${inputClassName(formErrors.notes)} p-4 resize-none`}
-                />
-              </FormField>
-
-              <label
-                htmlFor="volunteer-active"
-                className="flex items-center justify-between gap-4 p-3 bg-slate-950 border border-slate-800 rounded-xl cursor-pointer"
-              >
-                <span>
-                  <span className="text-sm font-semibold text-white block">Active Status</span>
-                  <span className="text-xs text-slate-500 block">
-                    Determine if this volunteer can be assigned to active events.
-                  </span>
-                </span>
-                <input
-                  id="volunteer-active"
-                  type="checkbox"
-                  checked={form.active}
-                  onChange={(e) => updateField("active", e.target.checked)}
-                  className="h-4.5 w-4.5 shrink-0 rounded accent-emerald-500"
-                />
-              </label>
-
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800/80">
-                <button
-                  type="button"
-                  onClick={closeForm}
-                  disabled={isSaving}
-                  className="px-4 py-2 rounded-xl text-sm font-semibold border border-slate-800 hover:bg-slate-800 text-slate-300 disabled:opacity-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSaving}
-                  className="inline-flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-semibold bg-emerald-500 text-slate-950 hover:bg-emerald-400 disabled:opacity-50 transition-colors"
-                >
-                  {isSaving && <LoaderCircle className="h-4 w-4 animate-spin" />}
-                  {isSaving ? "Saving..." : editingId ? "Save Changes" : "Add Volunteer"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <VolunteerFormDialog
+          key={formKey}
+          volunteer={formVolunteer}
+          defaultCountry={defaultCountry}
+          presets={presets}
+          canViewEmergency={canViewEmergency}
+          canViewMedical={canViewMedical}
+          volunteers={volunteers}
+          today={today}
+          onClose={closeForm}
+          onSaved={handleSaved}
+        />
       )}
 
       {/* Delete Confirmation Dialog */}
@@ -1242,7 +1339,7 @@ export default function VolunteersClient({
       {notice && (
         <div
           role={notice.type === "error" ? "alert" : "status"}
-          className={`fixed bottom-6 right-6 z-[60] max-w-sm flex items-start gap-3 rounded-xl border px-4 py-3 text-sm shadow-2xl backdrop-blur ${
+          className={`fixed bottom-4 right-4 left-4 sm:left-auto sm:bottom-6 sm:right-6 z-[60] sm:max-w-sm flex items-start gap-3 rounded-xl border px-4 py-3 text-sm shadow-2xl backdrop-blur ${
             notice.type === "success"
               ? "border-emerald-500/30 bg-slate-900/95 text-emerald-300"
               : "border-rose-500/30 bg-slate-900/95 text-rose-300"
@@ -1253,7 +1350,18 @@ export default function VolunteersClient({
           ) : (
             <TriangleAlert className="h-4 w-4 mt-0.5 shrink-0" />
           )}
-          <span className="flex-1">{notice.message}</span>
+          <span className="flex-1">
+            {notice.message}
+            {notice.link && (
+              <Link
+                href={notice.link.href}
+                className="mt-1.5 flex items-center gap-1 text-xs font-semibold text-white hover:text-emerald-300 transition-colors"
+              >
+                {notice.link.label}
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            )}
+          </span>
           <button
             type="button"
             onClick={() => setNotice(null)}

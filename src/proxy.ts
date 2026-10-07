@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
-const isPublicRoute = createRouteMatcher(["/sign-in(.*)", "/sign-up(.*)"]);
+const isPublicRoute = createRouteMatcher(["/sign-in(.*)", "/sign-up(.*)", "/join(.*)"]);
 
-// Every page except sign-in/sign-up requires a signed-in Clerk user.
+// Every page except sign-in/sign-up and the public /join page requires a signed-in Clerk user.
 // Role checks happen server-side in layouts/pages (src/lib/auth.ts) and in server actions.
 export default clerkMiddleware(
   async (auth, req) => {

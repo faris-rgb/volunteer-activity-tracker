@@ -10,6 +10,7 @@ import { isSanityConfigured, sanityClient, sanityWriteClient } from "@/lib/sanit
 import { findMockAttendance, listMockAttendance, upsertMockAttendance } from "@/lib/mockAttendanceStore";
 import { getActivitiesResultAction } from "@/app/actions/activities";
 import { getVolunteersAction } from "@/app/actions/volunteers";
+import { activityDurationHours, isValidHours, MAX_HOURS, nextHours, roundToQuarter } from "@/app/(app)/attendance/hours";
 
 export type AttendanceStatus = "Present" | "Absent" | "Late";
 
@@ -20,6 +21,8 @@ export interface AttendanceRecord {
   status: AttendanceStatus;
   /** ISO timestamp. Records saved by older versions may hold a preformatted time such as "08:52 AM". */
   checkInTime?: string;
+  /** Hours volunteered (0–24, quarter-hour steps). Only set for Present or Late. */
+  hours?: number;
   notes?: string;
   recordedBy?: string;
   createdAt?: string;
@@ -45,6 +48,11 @@ export interface RecordAttendanceInput {
   status: AttendanceStatus;
   /** Omit to keep the current notes; an empty string clears them. */
   notes?: string;
+  /**
+   * Hours volunteered (0–24 in 0.25 steps), ignored for Absent. Omit to keep the hours of a volunteer who was already
+   * checked in (otherwise the activity's duration is used); `null` resets them to the activity's duration.
+   */
+  hours?: number | null;
   /** The recorder's IANA time zone, used to decide whether the save happens on the activity's date. */
   timeZone?: string;
 }
@@ -54,6 +62,7 @@ interface ExistingAttendance {
   volunteerId: string;
   status: string | null;
   checkInTime?: string;
+  hours?: number | null;
   notes?: string;
   createdAt?: string;
 }
@@ -72,6 +81,7 @@ const ATTENDANCE_PROJECTION = `{
   "activityId": activity._ref,
   status,
   "checkInTime": coalesce(checkInTime, attendedAt),
+  hours,
   notes,
   recordedBy,
   "createdAt": coalesce(createdAt, _createdAt),
@@ -101,7 +111,15 @@ function normalizeRecords(records: AttendanceRecord[]): AttendanceRecord[] {
     if (!status) {
       return [];
     }
-    return [{ ...record, status, checkInTime: status === "Absent" ? undefined : record.checkInTime || undefined }];
+    const checkedIn = status !== "Absent";
+    return [
+      {
+        ...record,
+        status,
+        checkInTime: checkedIn ? record.checkInTime || undefined : undefined,
+        hours: checkedIn && isValidHours(record.hours) ? record.hours : undefined,
+      },
+    ];
   });
 }
 
@@ -124,6 +142,20 @@ function parseNotes(value: unknown): string | undefined {
     throw new AttendanceError(`Notes must be at most ${MAX_NOTES_LENGTH} characters.`);
   }
   return notes;
+}
+
+/** A number from 0 to 24 in quarter-hour steps; `null` asks for the activity's duration. */
+function parseHours(value: unknown): number | null | undefined {
+  if (value === undefined || value === null) {
+    return value;
+  }
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > MAX_HOURS) {
+    throw new AttendanceError(`Hours must be a number from 0 to ${MAX_HOURS}.`);
+  }
+  if (!isValidHours(value)) {
+    throw new AttendanceError("Hours must be in 15-minute steps (e.g. 2, 2.25, 2.5 or 2.75).");
+  }
+  return roundToQuarter(value);
 }
 
 /** Today's "YYYY-MM-DD" in the recorder's time zone; falls back to the server's when it is missing or invalid. */
@@ -243,6 +275,7 @@ export async function getAttendanceRecordsAction(activityId?: string): Promise<A
 
 interface SaveOptions {
   notes: string | undefined;
+  hours: number | null | undefined;
   recordedBy: string;
   timeZone: unknown;
 }
@@ -251,7 +284,7 @@ async function saveMockAttendance(
   activityId: string,
   volunteerIds: string[],
   status: AttendanceStatus,
-  { notes, recordedBy, timeZone }: SaveOptions
+  { notes, hours, recordedBy, timeZone }: SaveOptions
 ): Promise<AttendanceRecord[]> {
   const [activities, volunteers] = await Promise.all([getActivitiesResultAction(), getVolunteersAction()]);
   if (!activities.ok) {
@@ -277,6 +310,7 @@ async function saveMockAttendance(
   const nowDate = new Date();
   const now = nowDate.toISOString();
   const checkInNow = toDateKey(activity.date) === todayKey(timeZone, nowDate) ? now : undefined;
+  const defaultHours = activityDurationHours(activity.startTime, activity.endTime);
   return volunteerIds.map((volunteerId) => {
     const volunteer = volunteersById.get(volunteerId)!;
     const previous = findMockAttendance(activityId, volunteerId);
@@ -286,6 +320,7 @@ async function saveMockAttendance(
       activityId,
       status,
       checkInTime: nextCheckInTime(previous, status, checkInNow),
+      hours: nextHours(previous, status, hours, defaultHours),
       notes: notes === undefined ? previous?.notes : notes || undefined,
       recordedBy,
       createdAt: previous?.createdAt ?? now,
@@ -308,10 +343,10 @@ async function saveSanityAttendance(
   activityId: string,
   volunteerIds: string[],
   status: AttendanceStatus,
-  { notes, recordedBy, timeZone }: SaveOptions
+  { notes, hours, recordedBy, timeZone }: SaveOptions
 ): Promise<AttendanceRecord[]> {
   let lookup: {
-    activity: { date: string; maxVolunteers: number | null } | null;
+    activity: { date: string; startTime: string | null; endTime: string | null; maxVolunteers: number | null } | null;
     checkedInIds: string[];
     volunteerIds: string[];
     existing: ExistingAttendance[];
@@ -321,6 +356,8 @@ async function saveSanityAttendance(
       `{
         "activity": *[_type == "activity" && _id == $activityId][0]{
           "date": coalesce(date, ""),
+          startTime,
+          endTime,
           "maxVolunteers": coalesce(maxVolunteers, capacity)
         },
         "checkedInIds": array::unique(*[
@@ -333,6 +370,7 @@ async function saveSanityAttendance(
             "volunteerId": volunteer._ref,
             status,
             "checkInTime": coalesce(checkInTime, attendedAt),
+            hours,
             notes,
             "createdAt": coalesce(createdAt, _createdAt)
           }
@@ -360,16 +398,21 @@ async function saveSanityAttendance(
   const nowDate = new Date();
   const now = nowDate.toISOString();
   const checkInNow = toDateKey(lookup.activity.date) === todayKey(timeZone, nowDate) ? now : undefined;
+  const defaultHours = activityDurationHours(lookup.activity.startTime, lookup.activity.endTime);
   const transaction = sanityWriteClient.transaction();
   const saved = volunteerIds.map((volunteerId): AttendanceRecord => {
     const matches = lookup.existing.filter((record) => record.volunteerId === volunteerId);
     const previous = matches[matches.length - 1];
     const previousStatus = normalizeStatus(previous?.status);
-    const checkInTime = nextCheckInTime(
-      previousStatus ? { status: previousStatus, checkInTime: previous.checkInTime } : undefined,
-      status,
-      checkInNow
-    );
+    const previousRecord = previousStatus
+      ? {
+          status: previousStatus,
+          checkInTime: previous.checkInTime,
+          hours: isValidHours(previous.hours) ? previous.hours : undefined,
+        }
+      : undefined;
+    const checkInTime = nextCheckInTime(previousRecord, status, checkInNow);
+    const savedHours = nextHours(previousRecord, status, hours, defaultHours);
     const targetIds = matches.length > 0 ? matches.map((record) => record._id) : [attendanceDocId(activityId, volunteerId)];
 
     if (matches.length === 0) {
@@ -383,12 +426,17 @@ async function saveSanityAttendance(
       });
     }
 
-    const set: Record<string, string> = { status, recordedBy };
+    const set: Record<string, string | number> = { status, recordedBy };
     const unset: string[] = [];
     if (checkInTime) {
       set.checkInTime = checkInTime;
     } else {
       unset.push("checkInTime");
+    }
+    if (savedHours !== undefined) {
+      set.hours = savedHours;
+    } else {
+      unset.push("hours");
     }
     if (notes) {
       set.notes = notes;
@@ -403,6 +451,7 @@ async function saveSanityAttendance(
       activityId,
       status,
       checkInTime,
+      hours: savedHours,
       notes: notes === undefined ? previous?.notes : notes || undefined,
       recordedBy,
       createdAt: previous?.createdAt ?? now,
@@ -445,9 +494,11 @@ export async function recordAttendanceAction(input: RecordAttendanceInput): Prom
     const volunteerId = parseId(input.volunteerId, "volunteer");
     const status = parseStatus(input.status);
     const notes = parseNotes(input.notes);
+    const hours = parseHours(input.hours);
 
     const [record] = await saveAttendance(activityId, [volunteerId], status, {
       notes,
+      hours,
       recordedBy: getDisplayName(caller),
       timeZone: input.timeZone,
     });
@@ -482,8 +533,10 @@ export async function bulkRecordAttendanceAction(
     }
     const parsedStatus = parseStatus(status);
 
+    // Newly checked-in volunteers get the activity's duration; volunteers already checked in keep their hours.
     const records = await saveAttendance(parsedActivityId, ids, parsedStatus, {
       notes: undefined,
+      hours: undefined,
       recordedBy: getDisplayName(caller),
       timeZone,
     });

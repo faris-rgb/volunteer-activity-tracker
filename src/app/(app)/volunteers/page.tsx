@@ -1,12 +1,22 @@
 import React from "react";
 import { unstable_rethrow } from "next/navigation";
-import VolunteersClient from "./VolunteersClient";
+import VolunteersClient, { type VolunteerView } from "./VolunteersClient";
 import { getVolunteersAction, type VolunteerData } from "@/app/actions/volunteers";
 import { getPortalSettingsAction } from "@/app/actions/settings";
 import { requireRouteAccess } from "@/lib/auth";
-import { MANAGER_ROLES } from "@/lib/roles";
+import { ADMIN_ROLES, MANAGER_ROLES } from "@/lib/roles";
+import { DEFAULT_LANGUAGES, DEFAULT_SKILLS, DEFAULT_WHATSAPP_TEMPLATES } from "@/lib/domain";
+import type { VolunteerPresets } from "./volunteerUtils";
 
 export const revalidate = 0; // Disable server caching for this page to ensure fresh queries
+
+const FALLBACK_SETTINGS: VolunteerPresets & { defaultCountry: string } = {
+  organizationName: "Volunteer in Morocco",
+  defaultCountry: "",
+  skills: [...DEFAULT_SKILLS],
+  languages: [...DEFAULT_LANGUAGES],
+  whatsappTemplates: DEFAULT_WHATSAPP_TEMPLATES.map((template) => ({ ...template })),
+};
 
 async function loadVolunteers(): Promise<{ volunteers: VolunteerData[]; loadError: string | null }> {
   try {
@@ -21,13 +31,32 @@ async function loadVolunteers(): Promise<{ volunteers: VolunteerData[]; loadErro
   }
 }
 
-async function loadDefaultCountry(): Promise<string> {
+/** Presets only drive form suggestions and WhatsApp templates, so the built-in defaults are a safe fallback. */
+async function loadPresets(): Promise<VolunteerPresets & { defaultCountry: string }> {
   try {
-    return (await getPortalSettingsAction()).defaultCountry;
+    const settings = await getPortalSettingsAction();
+    return {
+      organizationName: settings.organizationName || FALLBACK_SETTINGS.organizationName,
+      defaultCountry: settings.defaultCountry,
+      skills: settings.skills,
+      languages: settings.languages,
+      whatsappTemplates: settings.whatsappTemplates,
+    };
   } catch (error) {
     unstable_rethrow(error);
-    return "";
+    console.error("Failed to load portal settings for the volunteer directory:", error);
+    return FALLBACK_SETTINGS;
   }
+}
+
+/** Today's date (YYYY-MM-DD) in Morocco, so ages and membership states match on server and client. */
+function todayInMorocco(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Casablanca",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
 }
 
 export default async function VolunteersPage({
@@ -37,14 +66,23 @@ export default async function VolunteersPage({
 }) {
   const [user, params] = await Promise.all([requireRouteAccess("/volunteers"), searchParams]);
   const canManage = MANAGER_ROLES.includes(user.role);
-  const [{ volunteers, loadError }, defaultCountry] = await Promise.all([loadVolunteers(), loadDefaultCountry()]);
+  const [{ volunteers, loadError }, { defaultCountry, ...presets }] = await Promise.all([
+    loadVolunteers(),
+    loadPresets(),
+  ]);
+  const initialView: VolunteerView = params.view === "pipeline" ? "pipeline" : "list";
 
   return (
     <VolunteersClient
       initialVolunteers={volunteers}
       canManage={canManage}
+      canViewEmergency={MANAGER_ROLES.includes(user.role)}
+      canViewMedical={ADMIN_ROLES.includes(user.role)}
       loadError={loadError}
       defaultCountry={defaultCountry}
+      presets={presets}
+      today={todayInMorocco()}
+      initialView={initialView}
       openCreateOnLoad={canManage && params.new === "1"}
     />
   );

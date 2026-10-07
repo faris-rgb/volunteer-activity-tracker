@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { unstable_rethrow } from "next/navigation";
 import {
   Users,
@@ -19,6 +20,26 @@ import { getVolunteersAction, type VolunteerData } from "@/app/actions/volunteer
 import { getActivitiesResultAction, type ActivityData } from "@/app/actions/activities";
 import { getAttendanceRecordsAction, type AttendanceRecord } from "@/app/actions/attendance";
 import { getPortalSettingsAction, type PortalSettings } from "@/app/actions/settings";
+import { getProjectsAction, type ProjectWithStats } from "@/app/actions/projects";
+import { getStaysAction } from "@/app/actions/stays";
+import { getRoomsAction } from "@/app/actions/rooms";
+import type { Room, Stay } from "@/lib/domain";
+import AlertsPanel from "@/components/dashboard/AlertsPanel";
+import ArrivalsCard from "@/components/dashboard/ArrivalsCard";
+import ImpactTotalsCard from "@/components/dashboard/ImpactTotalsCard";
+import PipelineCard from "@/components/dashboard/PipelineCard";
+import ProjectsStrip from "@/components/dashboard/ProjectsStrip";
+import ShareJoinCard from "@/components/dashboard/ShareJoinCard";
+import {
+  buildAlerts,
+  buildJoinUrl,
+  buildPipelineSummary,
+  buildTravelSummary,
+  countPublicProjects,
+  organizationToday,
+  stripProjects,
+  volunteerLookup,
+} from "@/components/dashboard/dashboardData";
 import NextActivityCountdown, {
   LocalDate,
   UpcomingActivitiesList,
@@ -28,7 +49,7 @@ import NextActivityCountdown, {
 } from "@/components/NextActivityCountdown";
 import StatCard, { type StatCardProps } from "@/components/StatCard";
 import { getDisplayName, requireAssignedRole } from "@/lib/auth";
-import { MANAGER_ROLES } from "@/lib/roles";
+import { MANAGER_ROLES, canRoleAccessRoute } from "@/lib/roles";
 import {
   formatDateLabel,
   getActivityMinutes,
@@ -43,10 +64,16 @@ const UPCOMING_LIST_SIZE = 4;
 const RECENT_VOLUNTEERS_SIZE = 4;
 /** UTC-12 to UTC+14: how far a viewer's wall clock can be from the server's. */
 const MAX_TIME_ZONE_GAP_MINUTES = 26 * 60;
+const DEFAULT_ORGANIZATION_NAME = "Volunteer in Morocco";
 
 interface Loaded<T> {
   data: T;
   failed: boolean;
+}
+
+/** A source this role may not read: resolved empty without calling the action. */
+function skipped<T>(fallback: T): Promise<Loaded<T>> {
+  return Promise.resolve({ data: fallback, failed: false });
 }
 
 async function load<T>(label: string, loader: () => Promise<T>, fallback: T): Promise<Loaded<T>> {
@@ -162,26 +189,89 @@ export default async function Dashboard() {
   const user = await requireAssignedRole();
   const canManage = MANAGER_ROLES.includes(user.role);
 
-  const [volunteersResult, activitiesResult, attendanceResult, settingsResult] = await Promise.all([
-    canManage
-      ? load("volunteers", () => getVolunteersAction(), [] as VolunteerData[])
-      : Promise.resolve<Loaded<VolunteerData[]>>({ data: [], failed: false }),
-    getActivitiesResultAction().then(
-      (result): Loaded<ActivityData[]> => (result.ok ? { data: result.data, failed: false } : { data: [], failed: true })
+  // Every source loads (and fails) on its own, so one failing source never breaks the page.
+  const [
+    volunteersResult,
+    activitiesResult,
+    attendanceResult,
+    settingsResult,
+    projectsResult,
+    staysResult,
+    roomsResult,
+    requestHeaders,
+  ] = await Promise.all([
+    canManage ? load("volunteers", () => getVolunteersAction(), [] as VolunteerData[]) : skipped<VolunteerData[]>([]),
+    load<ActivityData[]>(
+      "activities",
+      () =>
+        getActivitiesResultAction().then((result) => {
+          if (!result.ok) {
+            throw new Error(result.error);
+          }
+          return result.data;
+        }),
+      []
     ),
     load("attendance", () => getAttendanceRecordsAction(), [] as AttendanceRecord[]),
     load<PortalSettings | null>("portal settings", () => getPortalSettingsAction(), null),
+    load("projects", () => getProjectsAction(), [] as ProjectWithStats[]),
+    canManage ? load("stays", () => getStaysAction(), [] as Stay[]) : skipped<Stay[]>([]),
+    canManage ? load("rooms", () => getRoomsAction(), [] as Room[]) : skipped<Room[]>([]),
+    headers(),
   ]);
 
   const volunteers = volunteersResult.data;
   const activities = activitiesResult.data;
-  const attendanceTarget = settingsResult.data?.attendanceTarget ?? null;
+  const settings = settingsResult.data;
+  const attendanceTarget = settings?.attendanceTarget ?? null;
   const failedSources = [
     volunteersResult.failed && "volunteers",
     activitiesResult.failed && "activities",
     attendanceResult.failed && "attendance",
     settingsResult.failed && "portal settings",
+    projectsResult.failed && "projects",
+    staysResult.failed && "stays",
+    roomsResult.failed && "rooms",
   ].filter((source): source is string => Boolean(source));
+
+  // Stays, alerts and deadlines use the organisation's calendar day (Morocco).
+  const today = organizationToday();
+  const projects = projectsResult.failed ? null : projectsResult.data;
+  const stays = staysResult.failed ? null : staysResult.data;
+  const rooms = roomsResult.failed ? null : roomsResult.data;
+  const knownVolunteers = volunteersResult.failed ? null : volunteers;
+
+  const travelSummary =
+    canManage && stays
+      ? buildTravelSummary(
+          stays,
+          volunteerLookup(volunteers),
+          new Map((rooms ?? []).map((room) => [room._id, room])),
+          new Map((projects ?? []).map((project) => [project._id, project])),
+          today
+        )
+      : null;
+  const alertsResult = canManage
+    ? buildAlerts({
+        today,
+        stays,
+        rooms,
+        volunteers: knownVolunteers,
+        projects,
+        escLabelExpiry: settingsResult.failed ? null : settings?.escLabelExpiry,
+        canOpenSettings: canRoleAccessRoute(user.role, "/settings"),
+      })
+    : null;
+  const pipelineSummary = canManage && knownVolunteers ? buildPipelineSummary(knownVolunteers) : null;
+  const runningProjects = stripProjects(projectsResult.data);
+  const joinUrl = buildJoinUrl(requestHeaders);
+  const organizationName = settings?.organizationName?.trim() || DEFAULT_ORGANIZATION_NAME;
+  const heroDate = new Date().toLocaleDateString("en-GB", {
+    timeZone: "Africa/Casablanca",
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
 
   const knownActivityIds = activitiesResult.failed ? null : new Set(activities.map((activity) => activity._id));
   const knownVolunteerIds =
@@ -284,42 +374,55 @@ export default async function Dashboard() {
       failed={activitiesResult.failed}
     >
       <div className="flex-1 p-6 md:p-8 space-y-8 max-w-7xl mx-auto w-full">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-6">
-          <div>
-            <h1 className="text-3xl font-extrabold text-white tracking-tight">Dashboard Overview</h1>
-            <p className="text-slate-400 mt-1">
-              Welcome back, {getDisplayName(user)}. Here is how your volunteer program is doing.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            {canManage ? (
-              <>
+        <section className="relative overflow-hidden rounded-3xl border border-emerald-500/20 bg-gradient-to-br from-emerald-600/30 via-slate-950 to-slate-950 p-6 md:p-8 shadow-[0_20px_60px_-30px_rgba(16,185,129,0.6)]">
+          <div className="pointer-events-none absolute inset-0 bg-zellige opacity-[0.09]" aria-hidden="true" />
+          <div
+            className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-brand-red/20 blur-3xl"
+            aria-hidden="true"
+          />
+          <div className="relative flex flex-col lg:flex-row lg:items-end justify-between gap-6">
+            <div className="space-y-3">
+              <p className="inline-flex items-center gap-2 rounded-full border border-brand-sand/25 bg-brand-sand/10 px-3 py-1 text-xs font-semibold text-brand-sand">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" aria-hidden="true" />
+                {organizationName} · Martil &amp; Tetouan · {heroDate}
+              </p>
+              <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-white">
+                Marhaba, <span className="brand-gradient-text">{user.firstName?.trim() || getDisplayName(user)}</span>
+              </h1>
+              <p className="max-w-xl text-sm md:text-base text-slate-300">
+                Be the change — here is how your volunteers, projects and activities are doing today.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              {canManage ? (
+                <>
+                  <Link
+                    href="/volunteers"
+                    className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border border-white/10 bg-white/5 text-slate-100 backdrop-blur hover:bg-white/10 transition-all duration-200"
+                  >
+                    <Users className="h-4 w-4" />
+                    Manage Volunteers
+                  </Link>
+                  <Link
+                    href="/activities?new=1"
+                    className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-emerald-400 text-slate-950 hover:bg-emerald-300 shadow-lg shadow-emerald-500/30 transition-all duration-200"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add Activity
+                  </Link>
+                </>
+              ) : (
                 <Link
-                  href="/volunteers"
-                  className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border border-slate-800 bg-slate-900 text-slate-200 hover:bg-slate-800 hover:text-white transition-all duration-200"
+                  href="/activities"
+                  className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-emerald-400 text-slate-950 hover:bg-emerald-300 shadow-lg shadow-emerald-500/30 transition-all duration-200"
                 >
-                  <Users className="h-4 w-4" />
-                  Manage Volunteers
+                  <Calendar className="h-4 w-4" />
+                  Browse Activities
                 </Link>
-                <Link
-                  href="/activities?new=1"
-                  className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-emerald-500 text-slate-950 hover:bg-emerald-400 shadow-md shadow-emerald-500/20 transition-all duration-200"
-                >
-                  <Plus className="h-4 w-4" />
-                  Add Activity
-                </Link>
-              </>
-            ) : (
-              <Link
-                href="/activities"
-                className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-emerald-500 text-slate-950 hover:bg-emerald-400 shadow-md shadow-emerald-500/20 transition-all duration-200"
-              >
-                <Calendar className="h-4 w-4" />
-                Browse Activities
-              </Link>
-            )}
+              )}
+            </div>
           </div>
-        </div>
+        </section>
 
         {failedSources.length > 0 && (
           <div
@@ -341,6 +444,30 @@ export default async function Dashboard() {
             <StatCard key={item.title} {...item} />
           ))}
           <UpcomingActivitiesStat />
+        </div>
+
+        {canManage && (
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            <div className="xl:col-span-2">
+              <ArrivalsCard summary={travelSummary} />
+            </div>
+            {alertsResult && <AlertsPanel result={alertsResult} />}
+          </div>
+        )}
+
+        <ProjectsStrip projects={runningProjects} failed={projectsResult.failed} canManage={canManage} today={today} />
+
+        <div className={`grid grid-cols-1 gap-6 ${canManage ? "lg:grid-cols-3" : "lg:grid-cols-1"}`}>
+          <ImpactTotalsCard activities={activities} failed={activitiesResult.failed} canManage={canManage} />
+          {canManage && <PipelineCard summary={pipelineSummary} />}
+          {canManage && (
+            <ShareJoinCard
+              joinUrl={joinUrl}
+              organizationName={organizationName}
+              publicProjects={projectsResult.failed ? null : countPublicProjects(projectsResult.data)}
+              canManage={canManage}
+            />
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

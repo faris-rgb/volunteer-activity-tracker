@@ -1,28 +1,52 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-  --font-geist-sans: Arial, Helvetica, sans-serif;
-  --font-geist-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --background: #050a16;
+  --foreground: #e2e8f0;
+  /* Moroccan accents: flag green & red, sand/saffron */
+  --brand-green: #10b981;
+  --brand-red: #c1272d;
+  --brand-sand: #f5d9a8;
+  --zellige: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56' viewBox='0 0 56 56'%3E%3Cg fill='none' stroke='%2310b981' stroke-width='1'%3E%3Crect x='18' y='18' width='20' height='20'/%3E%3Crect x='18' y='18' width='20' height='20' transform='rotate(45 28 28)'/%3E%3Ccircle cx='28' cy='28' r='4'/%3E%3Cpath d='M0 0l8 8M56 0l-8 8M0 56l8-8M56 56l-8-8'/%3E%3C/g%3E%3C/svg%3E");
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-brand-sand: var(--brand-sand);
+  --color-brand-red: var(--brand-red);
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+}
+
+/* Subtle zellige star pattern. Put on a positioned element; content sits above it. */
+.bg-zellige {
+  background-image: var(--zellige);
+  background-size: 56px 56px;
+}
+
+.app-backdrop {
+  background:
+    radial-gradient(1200px 500px at 85% -10%, rgba(16, 185, 129, 0.10), transparent 60%),
+    radial-gradient(900px 400px at -10% 110%, rgba(193, 39, 45, 0.07), transparent 60%),
+    var(--background);
+}
+
+.brand-gradient-text {
+  background: linear-gradient(90deg, #6ee7b7 0%, #f5d9a8 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@media print {
+  body {
+    background: #fff;
+  }
 }

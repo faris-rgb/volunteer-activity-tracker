@@ -8,10 +8,39 @@ import { sanityClient, sanityWriteClient, isSanityConfigured } from "@/lib/sanit
 import { ADMIN_ROLES, APP_ROLES } from "@/lib/roles";
 import { assertActionRole, getDisplayName, type RoleUser } from "@/lib/auth";
 import { actionError, actionOk, type ActionResult } from "@/lib/actionResult";
-import { PORTAL_COUNTRIES, PORTAL_SETTINGS_ID } from "@/sanity/schemas/settings";
+import {
+  DEFAULT_ACTIVITY_CATEGORIES,
+  DEFAULT_LANGUAGES,
+  DEFAULT_LOCATIONS,
+  DEFAULT_SKILLS,
+  DEFAULT_WHATSAPP_TEMPLATES,
+  type PortalPresets,
+  type WhatsAppTemplate,
+} from "@/lib/domain";
+import {
+  PORTAL_COUNTRIES,
+  PORTAL_SETTINGS_ID,
+  SETTINGS_LIMITS,
+  TEMPLATE_KEY_PATTERN,
+  contactEmailError,
+  contactPhoneError,
+  escOidError,
+  escPicError,
+  isIsoDate,
+  normalizeEscOid,
+  normalizeEscPic,
+  normalizeSocialUrl,
+  socialUrlError,
+  templateKeyFromLabel,
+  unknownPlaceholders,
+} from "@/sanity/schemas/settings";
 
-/** Settings every signed-in role may read. */
-export interface PortalSettings {
+/**
+ * Settings every signed-in role may read: organisation details, ESC accreditation info, the preset
+ * lists (locations, languages, skills, activity categories) and the WhatsApp message templates.
+ * Missing stored values fall back to the defaults from @/lib/domain.
+ */
+export interface PortalSettings extends PortalPresets {
   organizationName: string;
   attendanceTarget: number;
   defaultCountry: string;
@@ -39,15 +68,26 @@ export type SavePortalSettingsResult =
 
 type PortalSettingsChanges = PortalSettingsInput & { updatedAt: string; updatedBy: string };
 
-type StoredPortalSettings = Partial<PortalSettingsChanges> & {
-  _id?: string;
-  _rev?: string;
-  _updatedAt?: string;
-  portalRevision?: string;
+/** Raw document as stored in Sanity (validated field by field when read). */
+type StoredPortalSettings = Record<string, unknown> & {
+  _id?: unknown;
+  _rev?: unknown;
+  _updatedAt?: unknown;
 };
 
-const ORGANIZATION_NAME_MAX_LENGTH = 100;
+type TagListField = "locations" | "languages" | "skills" | "activityCategories";
+type OptionalTextField =
+  | "contactEmail"
+  | "contactPhone"
+  | "instagramUrl"
+  | "facebookUrl"
+  | "escPic"
+  | "escOid"
+  | "escLabelExpiry";
+
 const REVISION_MAX_LENGTH = 128;
+/** Upper bound on raw list input before trimming/deduplication, to reject oversized payloads early. */
+const RAW_LIST_MAX_LENGTH = 200;
 const CONFLICT_ERROR = "Settings were changed by someone else. Load the latest settings and try again.";
 
 // The fixed singleton id is authoritative. Until the portal first saves it, a portalSettings
@@ -57,10 +97,54 @@ const PORTAL_SETTINGS_QUERY = `coalesce(
   *[_type == "portalSettings" && !(_id in path("drafts.**"))] | order(_updatedAt desc)[0]
 )`;
 
+const TAG_LISTS: Record<TagListField, { label: string; defaults: readonly string[] }> = {
+  locations: { label: "Locations", defaults: DEFAULT_LOCATIONS },
+  languages: { label: "Languages", defaults: DEFAULT_LANGUAGES },
+  skills: { label: "Skills", defaults: DEFAULT_SKILLS },
+  activityCategories: { label: "Activity categories", defaults: DEFAULT_ACTIVITY_CATEGORIES },
+};
+
+/** Optional text fields: label for error messages, normalisation, and validation (null = valid). */
+const OPTIONAL_TEXT_FIELDS: Record<
+  OptionalTextField,
+  { label: string; normalize: (value: string) => string; check: (value: string) => string | null }
+> = {
+  contactEmail: { label: "Contact email", normalize: (value) => value, check: contactEmailError },
+  contactPhone: { label: "Contact phone", normalize: (value) => value, check: contactPhoneError },
+  instagramUrl: {
+    label: "Instagram link",
+    normalize: normalizeSocialUrl,
+    check: (value) => socialUrlError(value, "instagram"),
+  },
+  facebookUrl: {
+    label: "Facebook link",
+    normalize: normalizeSocialUrl,
+    check: (value) => socialUrlError(value, "facebook"),
+  },
+  escPic: { label: "PIC", normalize: normalizeEscPic, check: escPicError },
+  escOid: { label: "OID", normalize: normalizeEscOid, check: escOidError },
+  escLabelExpiry: {
+    label: "Quality Label expiry date",
+    normalize: (value) => value,
+    check: (value) => (isIsoDate(value) ? null : "Enter a valid date."),
+  },
+};
+
+const OPTIONAL_TEXT_FIELD_NAMES = Object.keys(OPTIONAL_TEXT_FIELDS) as OptionalTextField[];
+
+function defaultTemplates(): WhatsAppTemplate[] {
+  return DEFAULT_WHATSAPP_TEMPLATES.map((template) => ({ ...template }));
+}
+
 const DEFAULT_PORTAL_SETTINGS: EditablePortalSettings = {
-  organizationName: "ServeTrack",
+  organizationName: "Volunteer in Morocco",
   attendanceTarget: 85,
-  defaultCountry: "United States",
+  defaultCountry: "Morocco",
+  locations: [...DEFAULT_LOCATIONS],
+  languages: [...DEFAULT_LANGUAGES],
+  skills: [...DEFAULT_SKILLS],
+  activityCategories: [...DEFAULT_ACTIVITY_CATEGORIES],
+  whatsappTemplates: defaultTemplates(),
   weeklyDigest: false,
   registrationAlerts: false,
   updatedAt: null,
@@ -69,7 +153,18 @@ const DEFAULT_PORTAL_SETTINGS: EditablePortalSettings = {
   revision: null,
 };
 
-let mockPortalSettings: EditablePortalSettings = { ...DEFAULT_PORTAL_SETTINGS };
+function cloneSettings(settings: EditablePortalSettings): EditablePortalSettings {
+  return {
+    ...settings,
+    locations: [...settings.locations],
+    languages: [...settings.languages],
+    skills: [...settings.skills],
+    activityCategories: [...settings.activityCategories],
+    whatsappTemplates: settings.whatsappTemplates.map((template) => ({ ...template })),
+  };
+}
+
+let mockPortalSettings: EditablePortalSettings = cloneSettings(DEFAULT_PORTAL_SETTINGS);
 let mockRevisionCounter = 0;
 
 function isPortalCountry(value: unknown): value is string {
@@ -88,6 +183,69 @@ function isConflictError(error: unknown): boolean {
   );
 }
 
+/** Trimmed, non-empty, case-insensitively unique strings (first spelling wins). */
+function uniqueTags(values: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const value of values) {
+    const tag = value.trim();
+    const id = tag.toLocaleLowerCase();
+    if (tag && !seen.has(id)) {
+      seen.add(id);
+      result.push(tag);
+    }
+  }
+  return result;
+}
+
+/* ---------- Reading stored values (anything missing or invalid falls back to defaults) ---------- */
+
+function readTagList(value: unknown, defaults: readonly string[]): string[] {
+  if (!Array.isArray(value)) {
+    return [...defaults];
+  }
+  const tags = uniqueTags(value.filter((tag): tag is string => typeof tag === "string")).filter(
+    (tag) => tag.length <= SETTINGS_LIMITS.tagLength
+  );
+  return tags.length ? tags.slice(0, SETTINGS_LIMITS.tagsPerList) : [...defaults];
+}
+
+function readTemplates(value: unknown): WhatsAppTemplate[] {
+  if (!Array.isArray(value)) {
+    return defaultTemplates();
+  }
+  const keys = new Set<string>();
+  const templates: WhatsAppTemplate[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== "object") {
+      continue;
+    }
+    const { key, _key: sanityKey, label, text } = item as Record<string, unknown>;
+    if (typeof label !== "string" || !label.trim() || typeof text !== "string" || !text.trim()) {
+      continue;
+    }
+    const usableKey = (candidate: unknown): candidate is string =>
+      typeof candidate === "string" && TEMPLATE_KEY_PATTERN.test(candidate) && !keys.has(candidate);
+    const templateKey = usableKey(key) ? key : usableKey(sanityKey) ? sanityKey : templateKeyFromLabel(label, keys);
+    keys.add(templateKey);
+    templates.push({ key: templateKey, label: label.trim(), text: text.trim() });
+    if (templates.length >= SETTINGS_LIMITS.templates) {
+      break;
+    }
+  }
+  return templates.length ? templates : defaultTemplates();
+}
+
+function readOptionalText(field: OptionalTextField, value: unknown): string | undefined {
+  if (typeof value !== "string" || !value.trim()) {
+    return undefined;
+  }
+  const { normalize, check } = OPTIONAL_TEXT_FIELDS[field];
+  const normalized = normalize(value.trim());
+  // Values that fail validation (e.g. a non-http link written outside the portal) are never handed out.
+  return check(normalized) === null ? normalized : undefined;
+}
+
 function getLastWriter(doc: StoredPortalSettings): Pick<EditablePortalSettings, "updatedBy" | "updatedOutsidePortal"> {
   // Sanity assigns its own _rev (it is not the transactionId), so attribute the save to updatedBy when present.
   const updatedBy = typeof doc.updatedBy === "string" && doc.updatedBy ? doc.updatedBy : null;
@@ -96,9 +254,10 @@ function getLastWriter(doc: StoredPortalSettings): Pick<EditablePortalSettings, 
 
 function toEditableSettings(doc: StoredPortalSettings | null | undefined): EditablePortalSettings {
   if (!doc) {
-    return { ...DEFAULT_PORTAL_SETTINGS };
+    return cloneSettings(DEFAULT_PORTAL_SETTINGS);
   }
-  return {
+
+  const settings: EditablePortalSettings = {
     organizationName:
       typeof doc.organizationName === "string" && doc.organizationName.trim()
         ? doc.organizationName
@@ -109,6 +268,11 @@ function toEditableSettings(doc: StoredPortalSettings | null | undefined): Edita
     defaultCountry: isPortalCountry(doc.defaultCountry)
       ? doc.defaultCountry
       : DEFAULT_PORTAL_SETTINGS.defaultCountry,
+    locations: readTagList(doc.locations, DEFAULT_LOCATIONS),
+    languages: readTagList(doc.languages, DEFAULT_LANGUAGES),
+    skills: readTagList(doc.skills, DEFAULT_SKILLS),
+    activityCategories: readTagList(doc.activityCategories, DEFAULT_ACTIVITY_CATEGORIES),
+    whatsappTemplates: readTemplates(doc.whatsappTemplates),
     weeklyDigest: doc.weeklyDigest === true,
     registrationAlerts: doc.registrationAlerts === true,
     updatedAt:
@@ -120,6 +284,110 @@ function toEditableSettings(doc: StoredPortalSettings | null | undefined): Edita
     ...getLastWriter(doc),
     revision: typeof doc._rev === "string" ? doc._rev : null,
   };
+
+  for (const field of OPTIONAL_TEXT_FIELD_NAMES) {
+    const value = readOptionalText(field, doc[field]);
+    if (value !== undefined) {
+      settings[field] = value;
+    }
+  }
+  return settings;
+}
+
+/* ---------- Validating input from the Settings page ---------- */
+
+function validateTagList(value: unknown, field: TagListField): string[] {
+  const { label } = TAG_LISTS[field];
+  if (!Array.isArray(value) || value.length > RAW_LIST_MAX_LENGTH) {
+    throw new Error(`Invalid ${label.toLowerCase()} list.`);
+  }
+  if (!value.every((tag) => typeof tag === "string")) {
+    throw new Error(`${label} may only contain text.`);
+  }
+  const tags = uniqueTags(value as string[]);
+  if (tags.length === 0) {
+    throw new Error(`${label}: add at least one entry.`);
+  }
+  if (tags.length > SETTINGS_LIMITS.tagsPerList) {
+    throw new Error(`${label}: use ${SETTINGS_LIMITS.tagsPerList} entries or fewer.`);
+  }
+  const tooLong = tags.find((tag) => tag.length > SETTINGS_LIMITS.tagLength);
+  if (tooLong) {
+    throw new Error(`${label}: "${tooLong.slice(0, 20)}..." is longer than ${SETTINGS_LIMITS.tagLength} characters.`);
+  }
+  return tags;
+}
+
+function validateTemplates(value: unknown): WhatsAppTemplate[] {
+  if (!Array.isArray(value) || value.length > RAW_LIST_MAX_LENGTH) {
+    throw new Error("Invalid WhatsApp templates.");
+  }
+  if (value.length === 0) {
+    throw new Error("Add at least one WhatsApp template.");
+  }
+  if (value.length > SETTINGS_LIMITS.templates) {
+    throw new Error(`Use ${SETTINGS_LIMITS.templates} WhatsApp templates or fewer.`);
+  }
+
+  const keys = new Set<string>();
+  const labels = new Set<string>();
+  return value.map((item, index) => {
+    if (!item || typeof item !== "object") {
+      throw new Error("Invalid WhatsApp template.");
+    }
+    const { key, label, text } = item as Record<string, unknown>;
+    const name = typeof label === "string" && label.trim() ? `"${label.trim().slice(0, 40)}"` : `#${index + 1}`;
+
+    if (typeof key !== "string" || !TEMPLATE_KEY_PATTERN.test(key) || keys.has(key)) {
+      throw new Error(`WhatsApp template ${name} has an invalid key. Reload the page and try again.`);
+    }
+    if (typeof label !== "string" || !label.trim()) {
+      throw new Error(`WhatsApp template ${name}: a label is required.`);
+    }
+    const cleanLabel = label.trim();
+    if (cleanLabel.length > SETTINGS_LIMITS.templateLabel) {
+      throw new Error(`WhatsApp template ${name}: use ${SETTINGS_LIMITS.templateLabel} characters or fewer for the label.`);
+    }
+    if (labels.has(cleanLabel.toLocaleLowerCase())) {
+      throw new Error(`WhatsApp template labels must be unique (${name} is used twice).`);
+    }
+    if (typeof text !== "string" || !text.trim()) {
+      throw new Error(`WhatsApp template ${name}: the message is required.`);
+    }
+    const cleanText = text.trim();
+    if (cleanText.length > SETTINGS_LIMITS.templateText) {
+      throw new Error(`WhatsApp template ${name}: use ${SETTINGS_LIMITS.templateText} characters or fewer.`);
+    }
+    const unknown = unknownPlaceholders(cleanText);
+    if (unknown.length) {
+      throw new Error(
+        `WhatsApp template ${name}: unknown placeholder ${unknown.map((placeholder) => `{${placeholder}}`).join(", ")}.`
+      );
+    }
+
+    keys.add(key);
+    labels.add(cleanLabel.toLocaleLowerCase());
+    return { key, label: cleanLabel, text: cleanText };
+  });
+}
+
+function validateOptionalText(field: OptionalTextField, value: unknown): string | undefined {
+  const { label, normalize, check } = OPTIONAL_TEXT_FIELDS[field];
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (typeof value !== "string" || value.length > 1000) {
+    throw new Error(`Invalid ${label.toLowerCase()}.`);
+  }
+  const normalized = normalize(value.trim());
+  if (!normalized) {
+    return undefined;
+  }
+  const error = check(normalized);
+  if (error) {
+    throw new Error(`${label}: ${error}`);
+  }
+  return normalized;
 }
 
 function validatePortalSettingsInput(input: unknown): PortalSettingsInput {
@@ -133,8 +401,8 @@ function validatePortalSettingsInput(input: unknown): PortalSettingsInput {
   if (!organizationName) {
     throw new Error("Organization name is required.");
   }
-  if (organizationName.length > ORGANIZATION_NAME_MAX_LENGTH) {
-    throw new Error(`Organization name must be ${ORGANIZATION_NAME_MAX_LENGTH} characters or fewer.`);
+  if (organizationName.length > SETTINGS_LIMITS.organizationName) {
+    throw new Error(`Organization name must be ${SETTINGS_LIMITS.organizationName} characters or fewer.`);
   }
   if (!isValidAttendanceTarget(data.attendanceTarget)) {
     throw new Error("Attendance target must be a whole number between 0 and 100.");
@@ -146,13 +414,25 @@ function validatePortalSettingsInput(input: unknown): PortalSettingsInput {
     throw new Error("Invalid notification preferences.");
   }
 
-  return {
+  const settings: PortalSettingsInput = {
     organizationName,
     attendanceTarget: data.attendanceTarget,
     defaultCountry: data.defaultCountry,
+    locations: validateTagList(data.locations, "locations"),
+    languages: validateTagList(data.languages, "languages"),
+    skills: validateTagList(data.skills, "skills"),
+    activityCategories: validateTagList(data.activityCategories, "activityCategories"),
+    whatsappTemplates: validateTemplates(data.whatsappTemplates),
     weeklyDigest: data.weeklyDigest,
     registrationAlerts: data.registrationAlerts,
   };
+  for (const field of OPTIONAL_TEXT_FIELD_NAMES) {
+    const value = validateOptionalText(field, data[field]);
+    if (value !== undefined) {
+      settings[field] = value;
+    }
+  }
+  return settings;
 }
 
 function validateRevision(revision: unknown): string | null {
@@ -165,9 +445,11 @@ function validateRevision(revision: unknown): string | null {
   return revision;
 }
 
+/* ---------- Actions ---------- */
+
 const loadPortalSettings = cache(async (): Promise<EditablePortalSettings> => {
   if (!isSanityConfigured()) {
-    return { ...mockPortalSettings };
+    return cloneSettings(mockPortalSettings);
   }
 
   try {
@@ -182,19 +464,34 @@ const loadPortalSettings = cache(async (): Promise<EditablePortalSettings> => {
 });
 
 /**
- * Organization name, attendance target and default country (defaults when nothing was saved yet).
- * Available to every role. Throws when Sanity cannot be read.
+ * Organisation details, ESC accreditation, presets and WhatsApp templates (defaults for anything not
+ * saved yet). None of these are sensitive. Available to every role. Throws when Sanity cannot be read.
  */
 export async function getPortalSettingsAction(): Promise<PortalSettings> {
   await assertActionRole([...APP_ROLES]);
-  const { organizationName, attendanceTarget, defaultCountry } = await loadPortalSettings();
-  return { organizationName, attendanceTarget, defaultCountry };
+  const settings = await loadPortalSettings();
+  const result: PortalSettings = {
+    organizationName: settings.organizationName,
+    attendanceTarget: settings.attendanceTarget,
+    defaultCountry: settings.defaultCountry,
+    locations: [...settings.locations],
+    languages: [...settings.languages],
+    skills: [...settings.skills],
+    activityCategories: [...settings.activityCategories],
+    whatsappTemplates: settings.whatsappTemplates.map((template) => ({ ...template })),
+  };
+  for (const field of OPTIONAL_TEXT_FIELD_NAMES) {
+    if (settings[field] !== undefined) {
+      result[field] = settings[field];
+    }
+  }
+  return result;
 }
 
 /** Full settings, including notification preferences and who saved them last. Admins only; throws on failure. */
 export async function getEditablePortalSettingsAction(): Promise<EditablePortalSettings> {
   await assertActionRole(ADMIN_ROLES);
-  return loadPortalSettings();
+  return cloneSettings(await loadPortalSettings());
 }
 
 async function getCallerName(caller: RoleUser): Promise<string> {
@@ -213,6 +510,40 @@ async function getCallerName(caller: RoleUser): Promise<string> {
   return getDisplayName(caller);
 }
 
+/** Splits the changes into Sanity `set` values and the optional fields to `unset` (cleared in the form). */
+function toSanityPatch(changes: PortalSettingsChanges): { set: Record<string, unknown>; unset: string[] } {
+  const set: Record<string, unknown> = {
+    organizationName: changes.organizationName,
+    attendanceTarget: changes.attendanceTarget,
+    defaultCountry: changes.defaultCountry,
+    locations: changes.locations,
+    languages: changes.languages,
+    skills: changes.skills,
+    activityCategories: changes.activityCategories,
+    whatsappTemplates: changes.whatsappTemplates.map((template) => ({
+      _key: template.key,
+      _type: "whatsappTemplate",
+      key: template.key,
+      label: template.label,
+      text: template.text,
+    })),
+    weeklyDigest: changes.weeklyDigest,
+    registrationAlerts: changes.registrationAlerts,
+    updatedAt: changes.updatedAt,
+    updatedBy: changes.updatedBy,
+  };
+  const unset: string[] = [];
+  for (const field of OPTIONAL_TEXT_FIELD_NAMES) {
+    const value = changes[field];
+    if (value === undefined) {
+      unset.push(field);
+    } else {
+      set[field] = value;
+    }
+  }
+  return { set, unset };
+}
+
 async function saveToSanity(
   changes: PortalSettingsChanges,
   expectedRevision: string | null
@@ -221,23 +552,28 @@ async function saveToSanity(
     const current = await sanityWriteClient.fetch<StoredPortalSettings | null>(PORTAL_SETTINGS_QUERY, {
       id: PORTAL_SETTINGS_ID,
     });
-    if ((current?._rev ?? null) !== expectedRevision) {
+    const currentRevision = typeof current?._rev === "string" ? current._rev : null;
+    if (currentRevision !== expectedRevision) {
       return null;
     }
 
     const transactionId = randomUUID();
-    const values = { ...changes, portalRevision: transactionId };
-    const doc =
-      current?._id === PORTAL_SETTINGS_ID && current._rev
-        ? await sanityWriteClient
-            .patch(PORTAL_SETTINGS_ID)
-            .ifRevisionId(current._rev)
-            .set(values)
-            .commit<StoredPortalSettings>({ transactionId })
-        : await sanityWriteClient.create<StoredPortalSettings>(
-            { _id: PORTAL_SETTINGS_ID, _type: "portalSettings", ...values },
-            { transactionId }
-          );
+    const { set, unset } = toSanityPatch(changes);
+    set.portalRevision = transactionId;
+
+    let doc: StoredPortalSettings;
+    if (current?._id === PORTAL_SETTINGS_ID && currentRevision) {
+      let patch = sanityWriteClient.patch(PORTAL_SETTINGS_ID).ifRevisionId(currentRevision).set(set);
+      if (unset.length) {
+        patch = patch.unset(unset);
+      }
+      doc = await patch.commit<StoredPortalSettings>({ transactionId });
+    } else {
+      doc = await sanityWriteClient.create<StoredPortalSettings>(
+        { _id: PORTAL_SETTINGS_ID, _type: "portalSettings", ...set },
+        { transactionId }
+      );
+    }
     return toEditableSettings(doc);
   } catch (error) {
     if (isConflictError(error)) {
@@ -269,8 +605,12 @@ export async function updatePortalSettingsAction(
       saved = null;
     } else {
       mockRevisionCounter += 1;
-      mockPortalSettings = { ...changes, updatedOutsidePortal: false, revision: `mock-${mockRevisionCounter}` };
-      saved = { ...mockPortalSettings };
+      mockPortalSettings = cloneSettings({
+        ...changes,
+        updatedOutsidePortal: false,
+        revision: `mock-${mockRevisionCounter}`,
+      });
+      saved = cloneSettings(mockPortalSettings);
     }
 
     if (!saved) {

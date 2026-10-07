@@ -2,8 +2,14 @@ import type { ValidationRule } from "./types";
 
 interface AttendanceValidationRule extends ValidationRule {
   required: () => AttendanceValidationRule;
+  min: (value: number) => AttendanceValidationRule;
   max: (value: number) => AttendanceValidationRule;
+  custom: (
+    validator: (value: unknown, context: { document?: Record<string, unknown> }) => true | string
+  ) => AttendanceValidationRule;
 }
+
+const MAX_HOURS = 24;
 
 export const attendanceSchema = {
   name: "attendance",
@@ -46,6 +52,28 @@ export const attendanceSchema = {
       type: "string",
     },
     {
+      name: "hours",
+      title: "Hours",
+      description:
+        "Hours volunteered at this activity (0–24, in 15-minute steps). Defaults to the activity's duration when the volunteer is checked in; empty when absent.",
+      type: "number",
+      validation: (Rule: AttendanceValidationRule) =>
+        Rule.min(0)
+          .max(MAX_HOURS)
+          .custom((hours, context) => {
+            if (hours === undefined || hours === null) {
+              return true;
+            }
+            if (typeof hours !== "number" || !Number.isInteger(hours * 4)) {
+              return "Use 15-minute steps (e.g. 2, 2.25, 2.5 or 2.75).";
+            }
+            const status = context.document?.status;
+            return typeof status === "string" && status.toLowerCase() === "absent"
+              ? "Absent volunteers can't log hours. Clear this field or change the status."
+              : true;
+          }),
+    },
+    {
       name: "notes",
       title: "Notes",
       type: "text",
@@ -72,20 +100,23 @@ export const attendanceSchema = {
       lastName: "volunteer.lastName",
       activity: "activity.title",
       status: "status",
+      hours: "hours",
     },
     prepare: ({
       firstName,
       lastName,
       activity,
       status,
+      hours,
     }: {
       firstName?: string;
       lastName?: string;
       activity?: string;
       status?: string;
+      hours?: number;
     }) => ({
       title: [firstName, lastName].filter(Boolean).join(" ") || "Unknown volunteer",
-      subtitle: [activity, status].filter(Boolean).join(" · "),
+      subtitle: [activity, status, typeof hours === "number" ? `${hours}h` : undefined].filter(Boolean).join(" · "),
     }),
   },
 };
