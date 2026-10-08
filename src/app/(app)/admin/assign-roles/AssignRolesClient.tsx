@@ -21,10 +21,10 @@ interface AssignRolesClientProps {
 }
 
 const ROLE_DESCRIPTIONS: Record<AppRole, string> = {
-  owner: "Full access to the portal.",
-  admin: "Full access to the portal — the same rights as an owner.",
-  staff: "Manage volunteers, activities and attendance records.",
-  volunteer: "View the dashboard, activities and attendance.",
+  owner: "Top boss: full access to the portal (and the only one with access to the code).",
+  admin: "Boss: full access to the portal and manages the staff — the same rights as an owner.",
+  staff: "Employee: runs the daily work — volunteers, projects, activities, attendance and stays.",
+  volunteer: "Volunteer: sees the dashboard, activities and attendance.",
 };
 
 const ROLE_BADGE_STYLES: Record<AppRole, string> = {
