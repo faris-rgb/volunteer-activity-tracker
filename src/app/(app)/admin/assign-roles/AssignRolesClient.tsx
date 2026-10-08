@@ -21,8 +21,8 @@ interface AssignRolesClientProps {
 }
 
 const ROLE_DESCRIPTIONS: Record<AppRole, string> = {
-  owner: "Full access, including granting and changing the owner role.",
-  admin: "Manage users, role assignments and portal settings.",
+  owner: "Full access to the portal.",
+  admin: "Full access to the portal — the same rights as an owner.",
   staff: "Manage volunteers, activities and attendance records.",
   volunteer: "View the dashboard, activities and attendance.",
 };
@@ -294,7 +294,6 @@ export default function AssignRolesClient({ users: initialUsers, currentUser }: 
     return () => window.clearTimeout(timeout);
   }, [notice]);
 
-  const isOwner = currentUser.role === "owner";
   const pendingUsers = users.filter((user) => !user.role);
   const teamMembers = users.filter((user) => user.role).sort(compareTeamMembers);
 
@@ -318,14 +317,10 @@ export default function AssignRolesClient({ users: initialUsers, currentUser }: 
     let lockReason: string | null = null;
     if (isSelf) {
       lockReason = "You can't change your own role. Ask another owner or admin.";
-    } else if (user.role === "owner" && !isOwner) {
-      lockReason = "Only an owner can change another owner's role.";
     } else if (!user._id) {
       lockReason = "This account record is incomplete and can't be updated.";
     }
-    const roleOptions = APP_ROLES.filter(
-      (role) => role !== "owner" || isOwner || user.role === "owner"
-    );
+    const roleOptions = [...APP_ROLES];
 
     return (
       <UserRoleRow
@@ -409,11 +404,7 @@ export default function AssignRolesClient({ users: initialUsers, currentUser }: 
 
       <Section
         title="Team members"
-        description={
-          isOwner
-            ? "Change anyone's role, including granting the owner role."
-            : "Change roles for admins, staff and volunteers. Only owners can manage owners."
-        }
+        description="Owners and admins can change anyone's role. There is always at least one owner."
         icon={<Users className="h-5 w-5 text-emerald-400" />}
         count={teamMembers.length}
       >

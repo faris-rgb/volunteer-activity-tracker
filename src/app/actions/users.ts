@@ -27,6 +27,16 @@ export async function getAppUsersAction(): Promise<AppUserData[]> {
   return dedupeUsers(docs.map(toAppUser));
 }
 
+async function countOwners(): Promise<number> {
+  if (!isSanityConfigured()) {
+    return mockAppUsers.filter((user) => user.role === "owner").length;
+  }
+  const docs = await sanityClient.fetch<StoredAppUser[]>(
+    `*[_type == "appUser" && lower(role) == "owner" && !(_id in path("drafts.**"))]`
+  );
+  return dedupeUsers(docs.map(toAppUser)).length;
+}
+
 export async function assignUserRoleAction(
   userId: string,
   role: AppRole
@@ -37,10 +47,6 @@ export async function assignUserRoleAction(
     if (!isAppRole(role)) {
       throw new Error("Invalid role");
     }
-    if (role === "owner" && caller.role !== "owner") {
-      throw new Error("Only an owner can grant the owner role");
-    }
-
     const target = isSanityConfigured()
       ? await sanityClient.getDocument<StoredAppUser>(userId)
       : mockAppUsers.find((user) => user._id === userId);
@@ -51,8 +57,9 @@ export async function assignUserRoleAction(
     if (targetUser.clerkUserId === caller.clerkUserId) {
       throw new Error("You cannot change your own role");
     }
-    if (targetUser.role === "owner" && caller.role !== "owner") {
-      throw new Error("Only an owner can change another owner's role");
+    // Admins have the same rights as owners in the portal. Only safeguard: never remove the last owner.
+    if (targetUser.role === "owner" && role !== "owner" && (await countOwners()) <= 1) {
+      throw new Error("This is the only owner. Make someone else owner first.");
     }
 
     if (!isSanityConfigured()) {
