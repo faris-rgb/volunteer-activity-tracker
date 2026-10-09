@@ -379,6 +379,22 @@ export function countAttempt(ip: string, now: number = Date.now()): boolean {
   return true;
 }
 
+/** Feedback submissions: at most 10 per IP and 200 in total per hour. Returns false when over the limit. */
+export function reserveFeedbackSlot(ip: string, now: number = Date.now()): boolean {
+  pruneBuckets(now);
+  const checks = [
+    { key: `feedback-ip:${hashKey(ip)}`, limit: ip === "unknown" ? 50 : 10, windowMs: HOUR_MS },
+    { key: "feedback-global", limit: 200, windowMs: HOUR_MS },
+  ];
+  for (const check of checks) {
+    if (liveHits(check.key, check.windowMs, now).length >= check.limit) return false;
+  }
+  for (const check of checks) {
+    buckets.set(check.key, [...(buckets.get(check.key) ?? []), now]);
+  }
+  return true;
+}
+
 export type SlotReservation = { ok: true; release: () => void } | { ok: false };
 
 /**

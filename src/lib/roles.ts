@@ -16,7 +16,7 @@ export const MANAGER_ROLES: AppRole[] = ["owner", "admin", "staff"];
 export const ADMIN_ROLES: AppRole[] = ["owner", "admin"];
 
 /** Day-to-day work pages: admins (the boss) and staff. The owner works on the technical side only. */
-const OPERATIONS_ROLES: AppRole[] = ["admin", "staff"];
+export const OPERATIONS_ROLES: AppRole[] = ["admin", "staff"];
 
 export const ROUTE_PERMISSIONS: Record<string, AppRole[]> = {
   "/dashboard": ["owner", "admin", "staff", "volunteer"],
@@ -25,6 +25,9 @@ export const ROUTE_PERMISSIONS: Record<string, AppRole[]> = {
   "/attendance": ["admin", "staff", "volunteer"],
   "/projects": OPERATIONS_ROLES,
   "/stays": OPERATIONS_ROLES,
+  "/volunteer-feedback": OPERATIONS_ROLES,
+  // Public feedback form, linked in the menu for volunteers.
+  "/feedback": ["volunteer"],
   "/settings": ADMIN_ROLES,
   "/admin/assign-roles": ADMIN_ROLES,
 };

@@ -34,6 +34,11 @@ export default function SiteFooter({ contact, year }: { contact: SiteContact; ye
                 Join us
               </Link>
             </li>
+            <li>
+              <Link href="/feedback" className="hover:text-white">
+                Give feedback
+              </Link>
+            </li>
           </ul>
         </div>
 

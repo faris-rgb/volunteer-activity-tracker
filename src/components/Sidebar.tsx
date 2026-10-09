@@ -16,6 +16,7 @@ import {
   X,
   UserCog,
   ExternalLink,
+  MessageSquareHeart,
 } from "lucide-react";
 import BrandMark from "@/components/BrandMark";
 import type { AppRole } from "@/lib/roles";
@@ -42,6 +43,8 @@ const MENU_GROUPS = [
     items: [
       { name: "Volunteers", href: "/volunteers", icon: Users },
       { name: "Stays & Arrivals", href: "/stays", icon: PlaneLanding },
+      { name: "Feedback", href: "/volunteer-feedback", icon: MessageSquareHeart },
+      { name: "Give feedback", href: "/feedback", icon: MessageSquareHeart },
     ],
   },
   {
