@@ -18,6 +18,7 @@ import { getDisplayName, type RoleUser } from "@/lib/auth";
 import { isMailConfigured } from "@/lib/mailer";
 import { APP_ROLES, ROLE_LABELS, type AppRole } from "@/lib/roles";
 import { isSanityConfigured, sanityClient } from "@/lib/sanity";
+import { SITE_URL } from "@/lib/siteUrl";
 
 const REPO_URL = "https://github.com/faris-rgb/volunteer-activity-tracker";
 const VERCEL_URL = "https://vercel.com/dashboard";
@@ -67,9 +68,7 @@ export default async function OwnerConsole({ user }: { user: RoleUser }) {
   const commit = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7);
   const commitMessage = process.env.VERCEL_GIT_COMMIT_MESSAGE?.split("\n")[0];
   const environment = process.env.VERCEL_ENV ?? "local";
-  const siteUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
-    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-    : "https://volunteer-activity-tracker.vercel.app";
+  const siteUrl = SITE_URL;
 
   const todo = [
     !isMailConfigured() && "Set up the email account so application PDFs reach Cultined (SMTP_PASS).",
