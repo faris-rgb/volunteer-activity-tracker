@@ -48,6 +48,7 @@ import NextActivityCountdown, {
   type ScheduledActivity,
 } from "@/components/NextActivityCountdown";
 import StatCard, { type StatCardProps } from "@/components/StatCard";
+import OwnerConsole from "@/components/owner/OwnerConsole";
 import { getDisplayName, requireAssignedRole } from "@/lib/auth";
 import { MANAGER_ROLES, canRoleAccessRoute } from "@/lib/roles";
 import {
@@ -187,6 +188,10 @@ function getInitials(volunteer: VolunteerData): string {
 
 export default async function Dashboard() {
   const user = await requireAssignedRole();
+  // The owner sees the technical console only; the day-to-day dashboard is for admins and staff.
+  if (user.role === "owner") {
+    return <OwnerConsole user={user} />;
+  }
   const canManage = MANAGER_ROLES.includes(user.role);
 
   // Every source loads (and fails) on its own, so one failing source never breaks the page.

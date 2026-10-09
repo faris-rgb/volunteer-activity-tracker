@@ -15,13 +15,16 @@ export const MANAGER_ROLES: AppRole[] = ["owner", "admin", "staff"];
 /** Roles that may manage users and portal settings. */
 export const ADMIN_ROLES: AppRole[] = ["owner", "admin"];
 
+/** Day-to-day work pages: admins (the boss) and staff. The owner works on the technical side only. */
+const OPERATIONS_ROLES: AppRole[] = ["admin", "staff"];
+
 export const ROUTE_PERMISSIONS: Record<string, AppRole[]> = {
   "/dashboard": ["owner", "admin", "staff", "volunteer"],
-  "/volunteers": MANAGER_ROLES,
-  "/activities": ["owner", "admin", "staff", "volunteer"],
-  "/attendance": ["owner", "admin", "staff", "volunteer"],
-  "/projects": MANAGER_ROLES,
-  "/stays": MANAGER_ROLES,
+  "/volunteers": OPERATIONS_ROLES,
+  "/activities": ["admin", "staff", "volunteer"],
+  "/attendance": ["admin", "staff", "volunteer"],
+  "/projects": OPERATIONS_ROLES,
+  "/stays": OPERATIONS_ROLES,
   "/settings": ADMIN_ROLES,
   "/admin/assign-roles": ADMIN_ROLES,
 };

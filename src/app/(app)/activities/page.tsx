@@ -4,7 +4,7 @@ import { cleanOptions, PROJECT_FILTER_NONE, type ActivityProjectOption } from ".
 import { getActivitiesResultAction } from "@/app/actions/activities";
 import { getProjectsAction } from "@/app/actions/projects";
 import { getPortalSettingsAction } from "@/app/actions/settings";
-import { requireAssignedRole } from "@/lib/auth";
+import { requireRouteAccess } from "@/lib/auth";
 import { MANAGER_ROLES } from "@/lib/roles";
 import { DEFAULT_ACTIVITY_CATEGORIES, DEFAULT_LOCATIONS } from "@/lib/domain";
 
@@ -61,7 +61,7 @@ export default async function ActivitiesPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const [user, params] = await Promise.all([requireAssignedRole(), searchParams]);
+  const [user, params] = await Promise.all([requireRouteAccess("/activities"), searchParams]);
   const canManage = MANAGER_ROLES.includes(user.role);
   const [result, projects, presets] = await Promise.all([getActivitiesResultAction(), loadProjects(), loadPresets()]);
 

@@ -105,7 +105,9 @@ export default function Sidebar({
 
   const menuGroups = MENU_GROUPS.map((group) => ({
     ...group,
-    items: group.items.filter((item) => ROUTE_PERMISSIONS[item.href]?.includes(role)),
+    items: group.items
+      .filter((item) => ROUTE_PERMISSIONS[item.href]?.includes(role))
+      .map((item) => (role === "owner" && item.href === "/dashboard" ? { ...item, name: "Owner console" } : item)),
   })).filter((group) => group.items.length > 0);
   const canShareJoinPage = ROUTE_PERMISSIONS["/volunteers"]?.includes(role);
 
