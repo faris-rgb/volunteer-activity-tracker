@@ -12,6 +12,7 @@ const DESCRIPTION =
   "Volunteer with us in Martil & Tetouan: community projects, European Solidarity Corps (ESC) placements and local volunteering. Apply online in a few minutes.";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/join" },
   title: "Join us",
   description: DESCRIPTION,
   openGraph: {

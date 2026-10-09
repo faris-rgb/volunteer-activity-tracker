@@ -5,6 +5,7 @@ import PageHero from "@/components/site/PageHero";
 import { WAYS_TO_VOLUNTEER } from "@/lib/siteContent";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/about" },
   title: "About us",
   description: "Who we are: a membership-based volunteering association in Martil & Tetouan, founded in 2017 by and for volunteers.",
 };

@@ -5,6 +5,7 @@ import PageHero from "@/components/site/PageHero";
 import { PROGRAMMES } from "@/lib/siteContent";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/programmes" },
   title: "What we do",
   description:
     "Our projects in Martil & Tetouan: Malabis Share clothing bank, Project Yatra, Soccer4All, beach clean-ups, Language Café and more.",

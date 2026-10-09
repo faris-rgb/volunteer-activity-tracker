@@ -3,6 +3,7 @@ import PageHero from "@/components/site/PageHero";
 import { DEFAULT_CONTACT } from "@/lib/siteContent";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/privacy" },
   title: "Privacy",
   description: "How Volunteer in Morocco handles the personal data you share in our application form.",
 };

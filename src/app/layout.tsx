@@ -2,6 +2,7 @@ import type { ComponentProps } from "react";
 import type { Metadata, Viewport } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Outfit } from "next/font/google";
+import { SITE_URL } from "@/lib/siteUrl";
 import "./globals.css";
 
 // Outfit: the typeface of the original volunteerinmorocco.com website.
@@ -16,7 +17,34 @@ export const metadata: Metadata = {
     default: "Volunteer in Morocco · Portal",
     template: "%s · Volunteer in Morocco",
   },
-  description: "Volunteer in Morocco (Martil & Tetouan): manage volunteers, projects, activities, stays and attendance.",
+  description:
+    "Volunteer in Morocco is a youth volunteering association in Martil & Tetouan, Morocco. Bénévolat au Maroc · التطوع في المغرب.",
+  metadataBase: new URL(SITE_URL),
+  applicationName: "Volunteer in Morocco",
+  keywords: [
+    "volunteer in Morocco",
+    "volunteering Morocco",
+    "volunteer Martil",
+    "volunteer Tetouan",
+    "European Solidarity Corps Morocco",
+    "bénévolat Maroc",
+    "bénévolat Tétouan",
+    "association Martil",
+    "تطوع في المغرب",
+    "تطوع مرتيل",
+    "جمعية تطوعية تطوان",
+  ],
+  openGraph: {
+    type: "website",
+    siteName: "Volunteer in Morocco",
+    locale: "en_GB",
+    alternateLocale: ["fr_FR", "ar_MA"],
+    images: [{ url: "/brand/vim-logo.jpg", width: 720, height: 720, alt: "Volunteer in Morocco logo" }],
+  },
+  twitter: { card: "summary", images: ["/brand/vim-logo.jpg"] },
+  ...(process.env.GOOGLE_SITE_VERIFICATION
+    ? { verification: { google: process.env.GOOGLE_SITE_VERIFICATION } }
+    : {}),
 };
 
 export const viewport: Viewport = {

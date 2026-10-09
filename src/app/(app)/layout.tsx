@@ -1,5 +1,8 @@
+import type { Metadata } from "next";
 import Sidebar from "@/components/Sidebar";
 import { getDisplayName, requireAssignedRole } from "@/lib/auth";
+
+export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 export default async function AppLayout({
   children,

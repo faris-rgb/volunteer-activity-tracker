@@ -8,6 +8,7 @@ import { getPublicJoinData } from "@/lib/publicJoin";
 import { JOURNEY, PROGRAMMES, WAYS_TO_VOLUNTEER } from "@/lib/siteContent";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/" },
   title: { absolute: "Volunteer in Morocco — Be the change in Martil & Tetouan" },
   description:
     "Volunteer in Morocco is a youth volunteering association in Martil & Tetouan. Join local projects, ESC volunteering and community activities.",
@@ -113,6 +114,34 @@ export default async function HomePage() {
               We bring together young people and organisations from different countries and are committed to making
               volunteering accessible to everyone — including young people with fewer opportunities.
             </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Local languages: French & Arabic (helps people in Morocco find us) */}
+      <section aria-label="Français et العربية" className="border-y border-slate-200 bg-slate-50">
+        <div className="mx-auto grid max-w-6xl grid-cols-1 gap-8 px-4 py-12 sm:px-6 md:grid-cols-2">
+          <div lang="fr">
+            <h2 className="text-xl font-bold text-slate-900">Bénévolat au Maroc — Martil &amp; Tétouan</h2>
+            <p className="mt-2 leading-relaxed text-slate-600">
+              Volunteer in Morocco est une association de jeunes bénévoles fondée en 2017 à Martil. Nous proposons des
+              projets de bénévolat local, l&apos;accueil de volontaires internationaux (Corps européen de solidarité) et
+              des activités pour la communauté de Martil et Tétouan.
+            </p>
+            <Link href="/join" className="mt-3 inline-flex items-center gap-2 font-semibold text-brand-red hover:underline">
+              Devenir bénévole
+              <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            </Link>
+          </div>
+          <div lang="ar" dir="rtl">
+            <h2 className="text-xl font-bold text-slate-900">التطوع في المغرب — مرتيل وتطوان</h2>
+            <p className="mt-2 leading-relaxed text-slate-600">
+              جمعية Volunteer in Morocco هي جمعية شبابية للتطوع تأسست سنة 2017 في مرتيل. نقدم مشاريع تطوعية محلية، ونستقبل
+              متطوعين دوليين في إطار الفيلق الأوروبي للتضامن، وننظم أنشطة لفائدة ساكنة مرتيل وتطوان.
+            </p>
+            <Link href="/join" className="mt-3 inline-flex items-center gap-2 font-semibold text-brand-red hover:underline">
+              انضم إلينا كمتطوع
+            </Link>
           </div>
         </div>
       </section>

@@ -9,6 +9,7 @@ import { FAQ, withContactDefaults } from "@/lib/siteContent";
 import type { PublicOrgInfo } from "@/app/join/joinShared";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/contact" },
   title: "Contact",
   description: "Get in touch with Volunteer in Morocco in Martil & Tetouan by WhatsApp, phone, email or social media.",
 };
