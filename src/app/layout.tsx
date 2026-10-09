@@ -42,9 +42,10 @@ export const metadata: Metadata = {
     images: [{ url: "/brand/vim-logo.jpg", width: 720, height: 720, alt: "Volunteer in Morocco logo" }],
   },
   twitter: { card: "summary", images: ["/brand/vim-logo.jpg"] },
-  ...(process.env.GOOGLE_SITE_VERIFICATION
-    ? { verification: { google: process.env.GOOGLE_SITE_VERIFICATION } }
-    : {}),
+  // Google Search Console ownership check (public value, not a secret).
+  verification: {
+    google: process.env.GOOGLE_SITE_VERIFICATION || "DI7qHhcfnJsDBYHv4by-ca4ypKlWk9JdE12kTtUa5mA",
+  },
 };
 
 export const viewport: Viewport = {
