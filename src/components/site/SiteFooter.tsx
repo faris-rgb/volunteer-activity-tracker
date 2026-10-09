@@ -4,8 +4,17 @@ import { BrandLogo } from "@/components/BrandMark";
 import { FacebookIcon, InstagramIcon } from "@/app/join/components/BrandIcons";
 import { whatsappLink } from "@/lib/domain";
 import { NAV_LINKS, type SiteContact } from "@/lib/siteContent";
+import type { SiteDictionary } from "@/i18n/site/en";
 
-export default function SiteFooter({ contact, year }: { contact: SiteContact; year: string }) {
+export default function SiteFooter({
+  contact,
+  year,
+  t,
+}: {
+  contact: SiteContact;
+  year: string;
+  t: Pick<SiteDictionary, "nav" | "footer">;
+}) {
   const whatsapp = whatsappLink(contact.phone, `Hi! I'd like to know more about volunteering with ${contact.organizationName}.`);
 
   return (
@@ -15,35 +24,35 @@ export default function SiteFooter({ contact, year }: { contact: SiteContact; ye
         <div className="space-y-4">
           <BrandLogo className="w-28" />
           <p className="text-sm leading-relaxed text-slate-400">
-            A membership-based non-profit association, founded in 2017 by and for volunteers in Martil &amp; Tetouan.
+            {t.footer.tagline}
           </p>
         </div>
 
         <div>
-          <h2 className="text-sm font-bold uppercase tracking-widest text-white">Explore</h2>
+          <h2 className="text-sm font-bold uppercase tracking-widest text-white">{t.footer.explore}</h2>
           <ul className="mt-4 space-y-2 text-sm">
             {NAV_LINKS.map((link) => (
               <li key={link.href}>
                 <Link href={link.href} className="hover:text-white">
-                  {link.label}
+                  {t.nav[link.key]}
                 </Link>
               </li>
             ))}
             <li>
               <Link href="/join" className="hover:text-white">
-                Join us
+                {t.footer.joinUs}
               </Link>
             </li>
             <li>
               <Link href="/feedback" className="hover:text-white">
-                Give feedback
+                {t.footer.giveFeedback}
               </Link>
             </li>
           </ul>
         </div>
 
         <div>
-          <h2 className="text-sm font-bold uppercase tracking-widest text-white">Contact</h2>
+          <h2 className="text-sm font-bold uppercase tracking-widest text-white">{t.footer.contact}</h2>
           <ul className="mt-4 space-y-3 text-sm">
             <li className="flex items-start gap-2">
               <Mail className="mt-0.5 h-4 w-4 shrink-0 text-red-400" aria-hidden="true" />
@@ -61,21 +70,21 @@ export default function SiteFooter({ contact, year }: { contact: SiteContact; ye
               <li className="flex items-start gap-2">
                 <MessageCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-400" aria-hidden="true" />
                 <a href={whatsapp} target="_blank" rel="noopener noreferrer" className="hover:text-white">
-                  WhatsApp us
+                  {t.footer.whatsapp}
                 </a>
               </li>
             )}
             <li className="flex items-start gap-2">
               <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-red-400" aria-hidden="true" />
               <a href={contact.mapsUrl} target="_blank" rel="noopener noreferrer" className="hover:text-white">
-                Tetouan &amp; Martil, Morocco
+                {t.footer.location}
               </a>
             </li>
           </ul>
         </div>
 
         <div>
-          <h2 className="text-sm font-bold uppercase tracking-widest text-white">Follow us</h2>
+          <h2 className="text-sm font-bold uppercase tracking-widest text-white">{t.footer.follow}</h2>
           <div className="mt-4 flex gap-2">
             <a
               href={contact.instagramUrl}
@@ -97,21 +106,21 @@ export default function SiteFooter({ contact, year }: { contact: SiteContact; ye
             </a>
           </div>
           <p className="mt-4 text-xs leading-relaxed text-slate-500">
-            European Solidarity Corps Quality Label — hosting &amp; supporting organisation.
+            {t.footer.escLabel}
           </p>
         </div>
       </div>
       <div className="border-t border-slate-800">
         <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-5 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <p>
-            © {year} {contact.organizationName}. All rights reserved.
+            © {year} {contact.organizationName}. {t.footer.rights}
           </p>
           <div className="flex gap-4">
             <Link href="/privacy" className="hover:text-slate-300">
-              Privacy
+              {t.footer.privacy}
             </Link>
             <Link href="/sign-in" className="hover:text-slate-300">
-              Staff sign in
+              {t.footer.staffSignIn}
             </Link>
           </div>
         </div>

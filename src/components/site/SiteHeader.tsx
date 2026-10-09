@@ -6,12 +6,23 @@ import { usePathname } from "next/navigation";
 import { LogIn, Menu, X } from "lucide-react";
 import BrandMark from "@/components/BrandMark";
 import { NAV_LINKS } from "@/lib/siteContent";
+import type { Locale } from "@/i18n/locales";
+import type { SiteDictionary } from "@/i18n/site/en";
+import LanguageSwitcher from "./LanguageSwitcher";
 
 function isActive(pathname: string, href: string) {
   return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export default function SiteHeader({ organizationName }: { organizationName: string }) {
+export default function SiteHeader({
+  organizationName,
+  locale,
+  t,
+}: {
+  organizationName: string;
+  locale: Locale;
+  t: Pick<SiteDictionary, "nav" | "header">;
+}) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [lastPathname, setLastPathname] = useState(pathname);
@@ -34,7 +45,7 @@ export default function SiteHeader({ organizationName }: { organizationName: str
     <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/90 backdrop-blur print:hidden">
       <div className="h-1 brand-rainbow" aria-hidden="true" />
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
-        <Link href="/" className="flex min-w-0 items-center gap-2.5" aria-label={`${organizationName} — home`}>
+        <Link href="/" className="flex min-w-0 items-center gap-2.5" aria-label={`${organizationName} — ${t.header.homeLabel}`}>
           <BrandMark className="h-10 w-10" />
           <span className="truncate text-base font-bold tracking-tight text-slate-900 sm:text-lg">{organizationName}</span>
         </Link>
@@ -51,7 +62,7 @@ export default function SiteHeader({ organizationName }: { organizationName: str
                   active ? "bg-red-50 text-brand-red" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                 }`}
               >
-                {link.label}
+                {t.nav[link.key]}
               </Link>
             );
           })}
@@ -63,20 +74,23 @@ export default function SiteHeader({ organizationName }: { organizationName: str
             className="hidden items-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 md:inline-flex"
           >
             <LogIn className="h-4 w-4" aria-hidden="true" />
-            Staff
+            {t.header.staff}
           </Link>
+          <div className="hidden sm:block">
+            <LanguageSwitcher locale={locale} />
+          </div>
           <Link
             href="/join"
             className="inline-flex items-center rounded-full bg-brand-red px-5 py-2.5 text-sm font-bold uppercase tracking-wide text-white shadow-lg shadow-red-500/25 transition-colors hover:bg-[#a51f24] focus:outline-none focus-visible:ring-2 focus-visible:ring-red-300"
           >
-            Join us
+            {t.header.joinUs}
           </Link>
           <button
             type="button"
             onClick={() => setOpen((value) => !value)}
             aria-expanded={open}
             aria-controls="site-mobile-menu"
-            aria-label={open ? "Close menu" : "Open menu"}
+            aria-label={open ? t.header.closeMenu : t.header.openMenu}
             className="rounded-full p-2 text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 lg:hidden"
           >
             {open ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
@@ -98,7 +112,7 @@ export default function SiteHeader({ organizationName }: { organizationName: str
                       active ? "bg-red-50 text-brand-red" : "text-slate-700 hover:bg-slate-100"
                     }`}
                   >
-                    {link.label}
+                    {t.nav[link.key]}
                   </Link>
                 </li>
               );
@@ -109,8 +123,11 @@ export default function SiteHeader({ organizationName }: { organizationName: str
                 className="flex items-center gap-2 rounded-xl px-4 py-3 text-base font-medium text-slate-500 hover:bg-slate-100"
               >
                 <LogIn className="h-4 w-4" aria-hidden="true" />
-                Staff sign in
+                {t.header.staffSignIn}
               </Link>
+            </li>
+            <li className="px-2 pt-2 sm:hidden">
+              <LanguageSwitcher locale={locale} compact />
             </li>
           </ul>
         </nav>

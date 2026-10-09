@@ -38,13 +38,22 @@ export interface FeedbackEntry extends ParsedFeedback {
   handled: boolean;
 }
 
+/** English validation messages (the public form shows them translated, matched by these exact texts). */
+export const FEEDBACK_MESSAGES = {
+  tooLong: "This answer is too long.",
+  maxChars: (max: number) => `Use ${max} characters or fewer.`,
+  chooseYesNo: "Choose yes or no.",
+  atLeastOne: "Answer at least one question — even one sentence helps us.",
+  unreadable: "Your feedback could not be read. Please reload the page.",
+} as const;
+
 export function emptyFeedback(formToken: string): FeedbackInput {
   return { name: "", about: "", liked: "", disliked: "", improve: "", hadProblems: "", problems: "", website: "", formToken };
 }
 
 function clean(value: unknown, max: number, multiline: boolean): { value: string; error?: string } {
   if (value === undefined || value === null) return { value: "" };
-  if (typeof value !== "string" || value.length > max * 2) return { value: "", error: "This answer is too long." };
+  if (typeof value !== "string" || value.length > max * 2) return { value: "", error: FEEDBACK_MESSAGES.tooLong };
   let text = "";
   for (const char of value) {
     const code = char.codePointAt(0) ?? 0;
@@ -56,7 +65,7 @@ function clean(value: unknown, max: number, multiline: boolean): { value: string
     text += char;
   }
   text = multiline ? text.replace(/\n{3,}/g, "\n\n").trim() : text.replace(/\s+/g, " ").trim();
-  if (text.length > max) return { value: text, error: `Use ${max} characters or fewer.` };
+  if (text.length > max) return { value: text, error: FEEDBACK_MESSAGES.maxChars(max) };
   return { value: text };
 }
 
@@ -64,7 +73,7 @@ function clean(value: unknown, max: number, multiline: boolean): { value: string
 export function validateFeedback(input: unknown): { data: ParsedFeedback | null; errors: FeedbackErrors } {
   const errors: FeedbackErrors = {};
   if (!input || typeof input !== "object" || Array.isArray(input)) {
-    return { data: null, errors: { form: "Your feedback could not be read. Please reload the page." } };
+    return { data: null, errors: { form: FEEDBACK_MESSAGES.unreadable } };
   }
   const raw = input as Record<string, unknown>;
   const field = (key: FeedbackField, max: number, multiline: boolean) => {
@@ -83,12 +92,12 @@ export function validateFeedback(input: unknown): { data: ParsedFeedback | null;
   const hadProblemsRaw = raw.hadProblems;
   let hadProblems: ProblemAnswer | undefined;
   if (hadProblemsRaw !== undefined && hadProblemsRaw !== null && hadProblemsRaw !== "") {
-    if (!(PROBLEM_ANSWERS as readonly unknown[]).includes(hadProblemsRaw)) errors.hadProblems = "Choose yes or no.";
+    if (!(PROBLEM_ANSWERS as readonly unknown[]).includes(hadProblemsRaw)) errors.hadProblems = FEEDBACK_MESSAGES.chooseYesNo;
     else hadProblems = hadProblemsRaw as ProblemAnswer;
   }
 
   if (!liked && !disliked && !improve && !problems && !hadProblems && Object.keys(errors).length === 0) {
-    errors.form = "Answer at least one question — even one sentence helps us.";
+    errors.form = FEEDBACK_MESSAGES.atLeastOne;
   }
   if (Object.keys(errors).length > 0) return { data: null, errors };
 

@@ -5,18 +5,25 @@ import PageHero from "@/components/site/PageHero";
 import { FacebookIcon, InstagramIcon } from "@/app/join/components/BrandIcons";
 import { whatsappLink } from "@/lib/domain";
 import { loadPublicSettings } from "@/lib/publicJoin";
-import { FAQ, withContactDefaults } from "@/lib/siteContent";
+import { withContactDefaults } from "@/lib/siteContent";
 import type { PublicOrgInfo } from "@/app/join/joinShared";
+import { getSiteDictionary } from "@/i18n/site";
+import { fill } from "@/i18n/rich";
 
-export const metadata: Metadata = {
-  alternates: { canonical: "/contact" },
-  title: "Contact",
-  description: "Get in touch with Volunteer in Morocco in Martil & Tetouan by WhatsApp, phone, email or social media.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getSiteDictionary();
+  return {
+    alternates: { canonical: "/contact" },
+    title: t.contact.meta.title,
+    description: t.contact.meta.description,
+  };
+}
 
 export const dynamic = "force-dynamic";
 
 export default async function ContactPage() {
+  const { t } = await getSiteDictionary();
+  const text = t.contact;
   let org: PublicOrgInfo = { organizationName: "Volunteer in Morocco" };
   try {
     org = (await loadPublicSettings()).org;
@@ -24,23 +31,22 @@ export default async function ContactPage() {
     console.error("Contact page: could not load organisation settings:", error);
   }
   const contact = withContactDefaults(org);
-  const whatsapp = whatsappLink(contact.phone, `Hi! I'd like to know more about volunteering with ${contact.organizationName}.`);
+  const whatsapp = whatsappLink(contact.phone, fill(text.whatsappMessage, { organization: contact.organizationName }));
 
   const cards = [
-    whatsapp && { href: whatsapp, icon: MessageCircle, title: "WhatsApp", detail: "Fastest way to reach us", external: true },
-    { href: `mailto:${contact.email}`, icon: Mail, title: "Email", detail: contact.email, external: false },
-    { href: `tel:${contact.phone.replace(/\s/g, "")}`, icon: Phone, title: "Phone", detail: contact.phone, external: false },
-    { href: contact.mapsUrl, icon: MapPin, title: "Visit us", detail: contact.address, external: true },
+    whatsapp && { href: whatsapp, icon: MessageCircle, title: text.cards.whatsapp, detail: text.cards.whatsappDetail, external: true },
+    { href: `mailto:${contact.email}`, icon: Mail, title: text.cards.email, detail: contact.email, external: false },
+    { href: `tel:${contact.phone.replace(/\s/g, "")}`, icon: Phone, title: text.cards.phone, detail: contact.phone, external: false },
+    { href: contact.mapsUrl, icon: MapPin, title: text.cards.visit, detail: text.address, external: true },
   ].filter(Boolean) as { href: string; icon: typeof Mail; title: string; detail: string; external: boolean }[];
 
   return (
     <>
-      <PageHero id="contact-title" eyebrow="Contact" title="Questions? Say hello">
-        We&apos;re a small team in Martil &amp; Tetouan. Send us a message and we&apos;ll get back to you — usually within a
-        few days.
+      <PageHero id="contact-title" eyebrow={text.hero.eyebrow} title={text.hero.title}>
+        {text.hero.text}
       </PageHero>
 
-      <section aria-label="Contact details" className="bg-white">
+      <section aria-label={text.detailsLabel} className="bg-white">
         <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
           <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {cards.map(({ href, icon: Icon, title, detail, external }) => (
@@ -55,7 +61,7 @@ export default async function ContactPage() {
                   </span>
                   <span className="mt-4 text-lg font-bold text-slate-900">
                     {title}
-                    {external && <span className="sr-only"> (opens in a new tab)</span>}
+                    {external && <span className="sr-only"> {text.opensInNewTab}</span>}
                   </span>
                   <span className="mt-1 break-words text-sm text-slate-600">{detail}</span>
                 </a>
@@ -66,17 +72,15 @@ export default async function ContactPage() {
           <div className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-2">
             <div className="overflow-hidden rounded-3xl border border-slate-200 bg-slate-100">
               <iframe
-                title="Map of Martil, Morocco"
+                title={text.mapTitle}
                 src="https://www.openstreetmap.org/export/embed.html?bbox=-5.30%2C35.58%2C-5.24%2C35.65&layer=mapnik&marker=35.616%2C-5.275"
                 className="h-80 w-full border-0"
                 loading="lazy"
               />
             </div>
             <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-              <h2 className="text-2xl font-bold text-slate-900">Follow our work</h2>
-              <p className="mt-2 text-slate-600">
-                See our projects, volunteers and new opportunities on social media.
-              </p>
+              <h2 className="text-2xl font-bold text-slate-900">{text.follow.title}</h2>
+              <p className="mt-2 text-slate-600">{text.follow.text}</p>
               <div className="mt-6 flex flex-col gap-3 sm:flex-row">
                 <a
                   href={contact.instagramUrl}
@@ -98,11 +102,11 @@ export default async function ContactPage() {
                 </a>
               </div>
               <div className="mt-8 rounded-2xl bg-red-50 p-5">
-                <p className="font-semibold text-slate-900">Want to volunteer?</p>
-                <p className="mt-1 text-sm text-slate-600">The quickest way is our online application form.</p>
+                <p className="font-semibold text-slate-900">{text.volunteer.title}</p>
+                <p className="mt-1 text-sm text-slate-600">{text.volunteer.text}</p>
                 <Link href="/join" className="mt-3 inline-flex items-center gap-2 font-semibold text-brand-red hover:underline">
-                  Apply now
-                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                  {text.volunteer.cta}
+                  <ArrowRight className="h-4 w-4 rtl:rotate-180" aria-hidden="true" />
                 </Link>
               </div>
             </div>
@@ -112,12 +116,12 @@ export default async function ContactPage() {
 
       <section aria-labelledby="faq-title" className="bg-slate-50">
         <div className="mx-auto max-w-3xl px-4 py-20 sm:px-6">
-          <p className="text-xs font-bold uppercase tracking-widest text-brand-red">FAQ</p>
+          <p className="text-xs font-bold uppercase tracking-widest text-brand-red">{text.faq.eyebrow}</p>
           <h2 id="faq-title" className="mt-2 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
-            Frequently asked questions
+            {text.faq.title}
           </h2>
           <div className="mt-8 space-y-3">
-            {FAQ.map((item) => (
+            {text.faq.items.map((item) => (
               <details key={item.q} className="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-semibold text-slate-900">
                   {item.q}
