@@ -17,9 +17,12 @@ import {
 import {
   createVolunteerAction,
   updateVolunteerAction,
+  type ApplicationDetails,
   type VolunteerData,
   type VolunteerInput,
 } from "@/app/actions/volunteers";
+import { GENDER_LABELS, OCCUPATION_LABELS } from "@/app/join/joinShared";
+import { formatDateLabel } from "@/lib/dates";
 import {
   APPLICATION_SOURCE_LABELS,
   APPLICATION_SOURCES,
@@ -306,6 +309,34 @@ function toPayload(form: FormState, { canViewMedical }: { canViewMedical: boolea
   };
 }
 
+/** Label/value rows for the extra join-form answers (read-only), skipping empty ones. */
+function applicationAnswers(details: ApplicationDetails | undefined): [string, string][] {
+  if (!details) return [];
+  const day = (value?: string) =>
+    value ? formatDateLabel(value, { day: "numeric", month: "short", year: "numeric" }) : "?";
+  const lookup = (labels: Record<string, string>, value?: string) => (value ? labels[value] ?? value : undefined);
+  const rows: [string, string | undefined][] = [
+    ["Gender", lookup(GENDER_LABELS, details.gender)],
+    ["Address", details.address],
+    [
+      "Available",
+      details.availableFrom || details.availableTo
+        ? `${day(details.availableFrom)} – ${day(details.availableTo)}`
+        : undefined,
+    ],
+    ["Travelling from", details.travelFrom],
+    ["European Youth Portal ID", details.escPortalId],
+    ["Sending organisation", details.sendingOrganisation],
+    ["Occupation", lookup(OCCUPATION_LABELS, details.occupation)],
+    ["Education", details.education],
+    ["Previous volunteering", details.previousVolunteering],
+    ["Hopes to learn", details.expectations],
+    ["Support needs", details.supportNeeds],
+    ["Photo consent", details.photoConsent === undefined ? undefined : details.photoConsent ? "Yes" : "No"],
+  ];
+  return rows.filter((row): row is [string, string] => !!row[1]);
+}
+
 function FormField({
   id,
   label,
@@ -466,6 +497,7 @@ export default function VolunteerFormDialog({
   const escAgeWarning = form.volunteerType === "incoming_esc" && isOutsideEscAge(age);
   const appliedProjectId = volunteer?.appliedProjectId;
   const motivation = volunteer?.motivation;
+  const joinAnswers = applicationAnswers(volunteer?.applicationDetails);
 
   return (
     <div
@@ -818,6 +850,23 @@ export default function VolunteerFormDialog({
                   <span className="normal-case tracking-normal font-normal text-slate-600">(from the join form)</span>
                 </span>
                 <p className="text-sm text-slate-300 mt-1.5 whitespace-pre-wrap break-words">{motivation}</p>
+              </div>
+            )}
+
+            {joinAnswers.length > 0 && (
+              <div className="rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3">
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                  Other answers
+                  <span className="normal-case tracking-normal font-normal text-slate-600">(from the join form)</span>
+                </span>
+                <dl className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
+                  {joinAnswers.map(([label, value]) => (
+                    <div key={label} className="min-w-0">
+                      <dt className="text-[11px] text-slate-500">{label}</dt>
+                      <dd className="text-sm text-slate-300 whitespace-pre-wrap break-words">{value}</dd>
+                    </div>
+                  ))}
+                </dl>
               </div>
             )}
 

@@ -36,12 +36,32 @@ export interface VolunteerInput extends VolunteerEditableExtras {
   active: boolean;
 }
 
+/** Extra answers from the public join form, stored read-only as `applicationDetails`. */
+export interface ApplicationDetails {
+  submittedAt?: string;
+  gender?: string;
+  address?: string;
+  escPortalId?: string;
+  sendingOrganisation?: string;
+  travelFrom?: string;
+  availableFrom?: string; // YYYY-MM-DD
+  availableTo?: string; // YYYY-MM-DD
+  occupation?: string;
+  education?: string;
+  previousVolunteering?: string;
+  expectations?: string;
+  /** Can describe health or financial needs, so (like medical notes) owner/admin only. */
+  supportNeeds?: string;
+  photoConsent?: boolean;
+}
+
 export interface VolunteerData extends VolunteerInput, VolunteerProfileExtras {
   _id: string;
   createdAt?: string;
   attendanceCount?: number;
   /** Name of the project chosen on the join form, when it still exists. */
   appliedProjectName?: string;
+  applicationDetails?: ApplicationDetails;
 }
 
 export interface DeletedVolunteer {
@@ -95,6 +115,8 @@ const PHONE_PATTERN = /^\+?[\d\s().-]+$/;
 const ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_LIST_ITEMS = 30;
+/** Matches the Settings preset limit, so any skill/language preset an admin adds can be saved. */
+const MAX_LIST_ITEM_LENGTH = 60;
 const MAX_PAYMENT_AMOUNT = 100_000;
 const CURRENCIES = ["MAD", "EUR"] as const;
 
@@ -136,6 +158,7 @@ const VOLUNTEER_PROJECTION = `{
   emergencyContact,
   medicalNotes,
   motivation,
+  applicationDetails,
   "appliedProjectId": coalesce(appliedProject._ref, appliedProjectId),
   "appliedProjectName": coalesce(
     appliedProject->name,
@@ -186,8 +209,8 @@ function readList(value: unknown, label: string): string[] {
     if (!item || seen.has(item.toLowerCase())) {
       continue;
     }
-    if (item.length > 50) {
-      throw new VolunteerError(`Each entry in ${label.toLowerCase()} must be at most 50 characters.`);
+    if (item.length > MAX_LIST_ITEM_LENGTH) {
+      throw new VolunteerError(`Each entry in ${label.toLowerCase()} must be at most ${MAX_LIST_ITEM_LENGTH} characters.`);
     }
     seen.add(item.toLowerCase());
     items.push(item);
@@ -399,6 +422,40 @@ function normalizeEmergencyContact(value: unknown): EmergencyContact | undefined
   return Object.keys(contact).length > 0 ? contact : undefined;
 }
 
+const APPLICATION_TEXT_KEYS = [
+  "submittedAt",
+  "gender",
+  "address",
+  "escPortalId",
+  "sendingOrganisation",
+  "travelFrom",
+  "occupation",
+  "education",
+  "previousVolunteering",
+  "expectations",
+  "supportNeeds",
+] as const satisfies readonly (keyof ApplicationDetails)[];
+
+function normalizeApplicationDetails(value: unknown): ApplicationDetails | undefined {
+  if (!value || typeof value !== "object") {
+    return undefined;
+  }
+  const data = value as Record<string, unknown>;
+  const details: ApplicationDetails = {};
+  for (const key of APPLICATION_TEXT_KEYS) {
+    const text = optionalString(data[key]);
+    if (text !== undefined) {
+      details[key] = text;
+    }
+  }
+  const availableFrom = optionalDate(data.availableFrom);
+  const availableTo = optionalDate(data.availableTo);
+  if (availableFrom) details.availableFrom = availableFrom;
+  if (availableTo) details.availableTo = availableTo;
+  if (typeof data.photoConsent === "boolean") details.photoConsent = data.photoConsent;
+  return Object.keys(details).length > 0 ? details : undefined;
+}
+
 /** Drops nulls and values outside the known presets (e.g. edited in Studio) so the UI can trust the shape. */
 function normalizeVolunteer(raw: Record<string, unknown>): VolunteerData {
   const text = (value: unknown) => (typeof value === "string" ? value : "");
@@ -432,6 +489,7 @@ function normalizeVolunteer(raw: Record<string, unknown>): VolunteerData {
     motivation: optionalString(raw.motivation),
     appliedProjectId: optionalString(raw.appliedProjectId),
     appliedProjectName: optionalString(raw.appliedProjectName),
+    applicationDetails: normalizeApplicationDetails(raw.applicationDetails),
   });
 }
 
@@ -440,7 +498,10 @@ function toPublicVolunteer({ _id, firstName, lastName, country, skills, active, 
   return withoutUndefined({ _id, firstName, lastName, email: "", country, skills, active, volunteerType });
 }
 
-/** Strips fields the caller's role may not see: emergency contact (managers only) and medical notes (owner/admin only). */
+/**
+ * Strips fields the caller's role may not see: emergency contact and join-form answers (managers only),
+ * medical notes and support needs (owner/admin only).
+ */
 function forRole(volunteer: VolunteerData, role: AppRole): VolunteerData {
   if (!MANAGER_ROLES.includes(role)) {
     return toPublicVolunteer(volunteer);
@@ -448,6 +509,11 @@ function forRole(volunteer: VolunteerData, role: AppRole): VolunteerData {
   if (!ADMIN_ROLES.includes(role)) {
     const rest = { ...volunteer };
     delete rest.medicalNotes;
+    if (rest.applicationDetails?.supportNeeds !== undefined) {
+      const details = { ...rest.applicationDetails };
+      delete details.supportNeeds;
+      rest.applicationDetails = details;
+    }
     return rest;
   }
   return volunteer;

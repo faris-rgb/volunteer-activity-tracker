@@ -147,7 +147,10 @@ export const APPLICATION_LIMITS = {
   phone: 30,
   place: 80,
   listItems: 15,
-  listItemLength: 40,
+  /** Same as the Settings preset limit, so every language/skill preset shown on the form can be sent. */
+  listItemLength: 60,
+  /** Emergency contact relation: the portal and the volunteer schema allow 60 characters. */
+  relation: 60,
   motivationMin: 15,
   motivation: 2000,
   longText: 1000,
@@ -478,6 +481,11 @@ function nameError(value: string, label: string, required: boolean): string | un
   return undefined;
 }
 
+/** True for a language/skill entry the form rejects (markup characters or a link). */
+export function hasUnsafeListChars(item: string): boolean {
+  return /[<>{}\\]/.test(item) || LINK_PATTERN.test(item);
+}
+
 function readList(value: unknown, noun: string): { items: string[]; error?: string } {
   if (value === undefined || value === null) return { items: [] };
   if (!Array.isArray(value) || value.length > APPLICATION_LIMITS.listItems * 4) {
@@ -494,7 +502,7 @@ function readList(value: unknown, noun: string): { items: string[]; error?: stri
     if (item.length > APPLICATION_LIMITS.listItemLength) {
       return { items: [], error: `Each entry must be ${APPLICATION_LIMITS.listItemLength} characters or fewer.` };
     }
-    if (/[<>{}\\]/.test(item) || LINK_PATTERN.test(item)) {
+    if (hasUnsafeListChars(item)) {
       return { items: [], error: `Please remove links and special characters from your ${noun}.` };
     }
     seen.add(item.toLowerCase());
@@ -656,7 +664,7 @@ export function validateApplication(
     }
   }
   const emergencyRelation = text("emergencyRelation");
-  errors.emergencyRelation ??= optionalLineError(emergencyRelation, APPLICATION_LIMITS.place);
+  errors.emergencyRelation ??= optionalLineError(emergencyRelation, APPLICATION_LIMITS.relation);
 
   const escPortalId = text("escPortalId");
   if (!errors.escPortalId && escPortalId) {

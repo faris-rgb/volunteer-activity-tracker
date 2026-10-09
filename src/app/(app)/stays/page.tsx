@@ -6,9 +6,8 @@ import { getVolunteersAction } from "@/app/actions/volunteers";
 import { getProjectsAction } from "@/app/actions/projects";
 import { getPortalSettingsAction } from "@/app/actions/settings";
 import { requireRouteAccess } from "@/lib/auth";
-import { formatDateKey } from "@/lib/dates";
 import { DEFAULT_LOCATIONS, DEFAULT_WHATSAPP_TEMPLATES } from "@/lib/domain";
-import type { StayProjectOption, StayVolunteerOption } from "./components/stayUtils";
+import { moroccoToday, type StayProjectOption, type StayVolunteerOption } from "./components/stayUtils";
 
 export const revalidate = 0;
 
@@ -22,22 +21,6 @@ async function load<T>(loader: () => Promise<T>, fallback: T, label: string): Pr
     unstable_rethrow(error);
     console.error(`Failed to load ${label} for the stays page:`, error);
     return { data: fallback, error: `${label.charAt(0).toUpperCase()}${label.slice(1)} could not be loaded.` };
-  }
-}
-
-/** Today in Morocco (the organisation's time zone), used until the browser reports its own date. */
-function moroccoToday(): string {
-  try {
-    const parts = new Intl.DateTimeFormat("en-US", {
-      timeZone: "Africa/Casablanca",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).formatToParts(new Date());
-    const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value;
-    return `${part("year")}-${part("month")}-${part("day")}`;
-  } catch {
-    return formatDateKey(new Date());
   }
 }
 

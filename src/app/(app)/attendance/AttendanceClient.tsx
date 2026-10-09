@@ -450,7 +450,8 @@ export default function AttendanceClient({
         return { volunteer, record, status: record?.status ?? "Unmarked" } as AttendanceRow;
       })
       .filter((row) => row.volunteer.active || row.record)
-      .sort((a, b) => fullName(a.volunteer).localeCompare(fullName(b.volunteer)));
+      // A fixed locale keeps the server-rendered order identical to the browser's (no hydration mismatch).
+      .sort((a, b) => fullName(a.volunteer).localeCompare(fullName(b.volunteer), "en"));
   }, [volunteers, recordsByKey, activityId]);
 
   const counts = useMemo(() => {

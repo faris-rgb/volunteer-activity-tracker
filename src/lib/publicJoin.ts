@@ -10,7 +10,9 @@ import {
   socialUrlError,
 } from "@/sanity/schemas/settings";
 import {
+  APPLICATION_LIMITS,
   cleanLine,
+  hasUnsafeListChars,
   isRealDate,
   moroccoToday,
   type JoinPresets,
@@ -29,7 +31,8 @@ const PUBLIC_STATUSES = ["planned", "open", "running"] as const satisfies readon
 const PUBLISHED_FILTER = `!(_id in path("drafts.**")) && !(_id in path("versions.**"))`;
 const MAX_PUBLIC_PROJECTS = 50;
 const MAX_TAGS = 60;
-const MAX_TAG_LENGTH = 60;
+// Presets are offered as chips on the join form, so only entries its validation accepts are shown.
+const MAX_TAG_LENGTH = APPLICATION_LIMITS.listItemLength;
 const INTAKE_NOTES_MAX = 2000; // matches the volunteer schema and the volunteers action
 
 /* ---------- Public read: organisation info + presets ---------- */
@@ -57,7 +60,7 @@ function readTags(value: unknown, defaults: readonly string[]): string[] {
   for (const raw of value) {
     if (typeof raw !== "string") continue;
     const tag = cleanLine(raw);
-    if (!tag || tag.length > MAX_TAG_LENGTH || seen.has(tag.toLowerCase())) continue;
+    if (!tag || tag.length > MAX_TAG_LENGTH || hasUnsafeListChars(tag) || seen.has(tag.toLowerCase())) continue;
     seen.add(tag.toLowerCase());
     tags.push(tag);
     if (tags.length >= MAX_TAGS) break;

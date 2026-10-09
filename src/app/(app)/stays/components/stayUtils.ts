@@ -15,7 +15,7 @@ import {
   type VolunteerType,
   type YouthpassStatus,
 } from "@/lib/domain";
-import { formatDateLabel, parseLocalDate } from "@/lib/dates";
+import { formatDateKey, formatDateLabel, parseLocalDate } from "@/lib/dates";
 
 /** The slice of a volunteer the stays page needs (sensitive fields stay on the server). */
 export interface StayVolunteerOption {
@@ -116,9 +116,27 @@ export function addDays(dateKey: string, days: number): string {
   return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
 }
 
+/** Same day `months` later, clamped to the end of a shorter month (31 Aug - 6 months = 28/29 Feb, not 3 Mar). */
 export function addMonths(dateKey: string, months: number): string {
   const [year, month, day] = dateKey.split("-").map(Number);
-  return new Date(Date.UTC(year, month - 1 + months, day)).toISOString().slice(0, 10);
+  const lastDay = new Date(Date.UTC(year, month + months, 0)).getUTCDate();
+  return new Date(Date.UTC(year, month - 1 + months, Math.min(day, lastDay))).toISOString().slice(0, 10);
+}
+
+/** Today's "YYYY-MM-DD" in Morocco (the organisation's time zone), whatever time zone the code runs in. */
+export function moroccoToday(): string {
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: "Africa/Casablanca",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(new Date());
+    const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value;
+    return `${part("year")}-${part("month")}-${part("day")}`;
+  } catch {
+    return formatDateKey(new Date());
+  }
 }
 
 export function shortDate(dateKey: string | undefined): string {
@@ -240,7 +258,8 @@ export function passportWarning(
   if (stay.arrivalDate && expiry < stay.arrivalDate) {
     return `Passport expires on ${shortDate(expiry)}, before the arrival date.`;
   }
-  const reference = stay.departureDate ?? stay.arrivalDate;
+  // `||`, not `??`: the stay form passes "" for an empty departure date.
+  const reference = stay.departureDate || stay.arrivalDate;
   if (!reference) return null;
   const minimum = addDays(reference, ESC_RULES.visaFreeDays);
   if (expiry < minimum) {

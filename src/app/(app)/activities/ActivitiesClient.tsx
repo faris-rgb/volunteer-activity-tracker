@@ -158,6 +158,9 @@ const EMPTY_FORM: FormState = {
 
 const NETWORK_ERROR = "Could not reach the server. Check your connection and try again.";
 
+/** Fixed collation locale, so lists sorted on the server and in the browser match (no hydration mismatch). */
+const SORT_LOCALE = "en";
+
 const INPUT_BASE =
   "w-full bg-slate-950 border rounded-xl text-sm placeholder-slate-600 focus:outline-none focus:border-emerald-500/50 [color-scheme:dark] disabled:opacity-60";
 
@@ -396,7 +399,7 @@ export default function ActivitiesClient({
   const categories = useMemo(
     () =>
       Array.from(new Set(activities.map((activity) => activity.category).filter(Boolean))).sort((a, b) =>
-        a.localeCompare(b)
+        a.localeCompare(b, SORT_LOCALE)
       ),
     [activities]
   );
@@ -422,7 +425,7 @@ export default function ActivitiesClient({
       names.set(projectFilter, "Unknown project");
     }
     return Array.from(names, ([id, name]) => ({ id, name, count: counts.get(id) ?? 0 })).sort((a, b) =>
-      a.name.localeCompare(b.name)
+      a.name.localeCompare(b.name, SORT_LOCALE)
     );
   }, [projects, activities, projectFilter]);
   const unassignedCount = useMemo(() => activities.filter((activity) => !activity.projectId).length, [activities]);
@@ -678,7 +681,7 @@ export default function ActivitiesClient({
     const filters: Filters = { query, status: statusFilter, category: activeCategory, project: projectFilter };
     const result = activities.filter((activity) => matchesFilters(activity, filters));
     result.sort((a, b) => {
-      if (sortOrder === "title") return a.title.localeCompare(b.title);
+      if (sortOrder === "title") return a.title.localeCompare(b.title, SORT_LOCALE);
       const diff = getStartTimestamp(a) - getStartTimestamp(b);
       return sortOrder === "date-asc" ? diff : -diff;
     });

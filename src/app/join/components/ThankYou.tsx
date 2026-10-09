@@ -27,7 +27,7 @@ export default function ThankYou({
 
   return (
     <section aria-labelledby="join-thank-you-title" className="mx-auto max-w-2xl px-4 py-16 sm:px-6 sm:py-24">
-      <div className="rounded-3xl border border-red-200 bg-slate-900/80 p-6 text-center shadow-2xl shadow-emerald-500/5 sm:p-10">
+      <div className="rounded-3xl border border-red-200 bg-white p-6 text-center shadow-2xl shadow-slate-200/80 sm:p-10">
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-red-200 bg-red-50">
           <CircleCheckBig className="h-8 w-8 text-brand-red" aria-hidden="true" />
         </div>
@@ -71,7 +71,7 @@ export default function ThankYou({
                 href={org.instagramUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-slate-800/60 px-4 py-2.5 text-sm font-semibold text-slate-900 transition-colors hover:border-red-300 hover:bg-slate-100"
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition-colors hover:border-red-300 hover:bg-slate-100"
               >
                 <InstagramIcon className="h-4 w-4" />
                 Follow us on Instagram
@@ -82,7 +82,7 @@ export default function ThankYou({
                 href={whatsapp}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-slate-800/60 px-4 py-2.5 text-sm font-semibold text-slate-900 transition-colors hover:border-red-300 hover:bg-slate-100"
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition-colors hover:border-red-300 hover:bg-slate-100"
               >
                 <MessageCircle className="h-4 w-4" aria-hidden="true" />
                 WhatsApp us
@@ -91,7 +91,7 @@ export default function ThankYou({
             {org.contactEmail && (
               <a
                 href={`mailto:${org.contactEmail}`}
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-slate-800/60 px-4 py-2.5 text-sm font-semibold text-slate-900 transition-colors hover:border-red-300 hover:bg-slate-100"
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition-colors hover:border-red-300 hover:bg-slate-100"
               >
                 <Mail className="h-4 w-4" aria-hidden="true" />
                 Email us

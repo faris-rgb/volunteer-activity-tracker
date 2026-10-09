@@ -12,6 +12,7 @@ import {
   YOUTHPASS_STATUS_LABELS,
   documentsChecklist,
   documentsCompleteness,
+  plural,
   shortDate,
   stayLength,
   visaCounter,
@@ -243,7 +244,7 @@ export default function StaysTable({
                             <div>
                               {shortDate(stay.arrivalDate)} → {shortDate(stay.departureDate)}
                             </div>
-                            {nights !== null && <div className="text-xs text-slate-500">{nights} nights</div>}
+                            {nights !== null && <div className="text-xs text-slate-500">{plural(nights, "night")}</div>}
                           </>
                         ) : (
                           <span className="text-slate-600">Dates not set</span>

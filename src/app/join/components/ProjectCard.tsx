@@ -5,9 +5,9 @@ import { ArrowRight, CalendarDays, Clock, Globe, MapPin, Users } from "lucide-re
 import { daysUntil, formatAgeRange, formatDateRange, formatDay, type PublicProject } from "../joinShared";
 
 const STATUS_BADGES: Record<PublicProject["status"], { label: string; className: string }> = {
-  planned: { label: "Coming soon", className: "border-sky-500/30 bg-sky-50 text-sky-300" },
+  planned: { label: "Coming soon", className: "border-sky-200 bg-sky-50 text-sky-700" },
   open: { label: "Open for applications", className: "border-red-200 bg-red-50 text-brand-red" },
-  running: { label: "Running now", className: "border-violet-500/30 bg-violet-500/10 text-violet-300" },
+  running: { label: "Running now", className: "border-violet-200 bg-violet-50 text-violet-700" },
 };
 
 const LONG_DESCRIPTION = 220;
@@ -41,7 +41,7 @@ export default function ProjectCard({
   const [expanded, setExpanded] = useState(false);
   const badge = project.acceptingApplications
     ? STATUS_BADGES[project.status]
-    : { label: "Applications closed", className: "border-slate-300 bg-slate-800/60 text-slate-600" };
+    : { label: "Applications closed", className: "border-slate-300 bg-slate-100 text-slate-600" };
   const ages = formatAgeRange(project.ageMin, project.ageMax);
   const spots = spotsText(project.spotsLeft);
   const deadline = project.applicationDeadline ? deadlineText(project.applicationDeadline, today) : null;
@@ -68,7 +68,7 @@ export default function ProjectCard({
             className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${
               project.spotsLeft === 0
                 ? "border-amber-200 bg-amber-50 text-amber-700"
-                : "border-slate-300 bg-slate-800/60 text-slate-700"
+                : "border-slate-300 bg-slate-100 text-slate-700"
             }`}
           >
             {spots}
@@ -153,7 +153,7 @@ export default function ProjectCard({
           onClick={() => onApply(project.id)}
           disabled={!project.acceptingApplications}
           aria-describedby={titleId}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-red px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-red-500/20 transition-colors hover:bg-[#a51f24] focus:outline-none focus-visible:ring-2 focus-visible:ring-red-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:bg-slate-800 disabled:text-slate-500 disabled:shadow-none"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-red px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-red-500/20 transition-colors hover:bg-[#a51f24] focus:outline-none focus-visible:ring-2 focus-visible:ring-red-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 disabled:shadow-none"
         >
           {project.acceptingApplications ? (
             <>

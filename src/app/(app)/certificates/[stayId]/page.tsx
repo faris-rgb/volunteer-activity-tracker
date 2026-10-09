@@ -5,10 +5,9 @@ import { ArrowLeft, TriangleAlert } from "lucide-react";
 import PrintButton from "./PrintButton";
 import { getStayCertificateAction } from "@/app/actions/stays";
 import { getPortalSettingsAction, type PortalSettings } from "@/app/actions/settings";
-import { requireRole } from "@/lib/auth";
-import { MANAGER_ROLES } from "@/lib/roles";
-import { formatDateKey, formatDateLabel } from "@/lib/dates";
-import { diffDays } from "../../stays/components/stayUtils";
+import { requireRouteAccess } from "@/lib/auth";
+import { formatDateLabel } from "@/lib/dates";
+import { diffDays, moroccoToday } from "../../stays/components/stayUtils";
 
 export const revalidate = 0;
 
@@ -70,7 +69,8 @@ function Toolbar({ children }: { children?: ReactNode }) {
 }
 
 export default async function CertificatePage({ params }: { params: Promise<{ stayId: string }> }) {
-  const [, { stayId }] = await Promise.all([requireRole(MANAGER_ROLES), params]);
+  // Same audience as the Stays page (admins and staff); the owner only has the technical console.
+  const [, { stayId }] = await Promise.all([requireRouteAccess("/stays"), params]);
   const [result, settings] = await Promise.all([getStayCertificateAction(stayId), loadSettings()]);
 
   if (!result.ok) {
@@ -94,7 +94,7 @@ export default async function CertificatePage({ params }: { params: Promise<{ st
   const end = stay.departureDate ?? project?.endDate;
   const days = start && end && end > start ? diffDays(start, end) : null;
   const fullName = volunteer ? `${volunteer.firstName} ${volunteer.lastName}`.trim() : "";
-  const today = formatDateKey(new Date());
+  const today = moroccoToday();
   const remaining = Math.max(0, data.activitiesAttended - data.activityTitles.length);
 
   const notes: string[] = [];

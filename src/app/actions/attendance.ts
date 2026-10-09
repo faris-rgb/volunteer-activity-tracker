@@ -427,7 +427,9 @@ async function saveSanityAttendance(
     }
 
     const set: Record<string, string | number> = { status, recordedBy };
-    const unset: string[] = [];
+    // Legacy records kept their check-in in `attendedAt` (read as a fallback for checkInTime). Its value, if any,
+    // was carried over above, so drop it; otherwise a cleared check-in would show the stale legacy time again.
+    const unset: string[] = ["attendedAt"];
     if (checkInTime) {
       set.checkInTime = checkInTime;
     } else {
@@ -443,7 +445,7 @@ async function saveSanityAttendance(
     } else if (notes === "") {
       unset.push("notes");
     }
-    targetIds.forEach((id) => transaction.patch(id, unset.length > 0 ? { set, unset } : { set }));
+    targetIds.forEach((id) => transaction.patch(id, { set, unset }));
 
     return {
       _id: targetIds[targetIds.length - 1],

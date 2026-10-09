@@ -185,12 +185,15 @@ function ArrivalCard({
             const Icon = option.icon;
             const selected = stay.pickupStatus === option.status;
             const pending = busyStatus === option.status;
+            // "Picked up" set in the edit form doesn't change the stay status, so keep it clickable to mark the arrival.
+            const canConfirmArrival =
+              option.status === "picked_up" && (stay.status === "planned" || stay.status === "confirmed");
             return (
               <button
                 key={option.status}
                 type="button"
                 aria-pressed={selected}
-                disabled={busyStatus !== null || selected || stay.status === "cancelled"}
+                disabled={busyStatus !== null || (selected && !canConfirmArrival) || stay.status === "cancelled"}
                 onClick={() => onPickup(stay, option.status)}
                 className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-colors disabled:cursor-default ${
                   selected

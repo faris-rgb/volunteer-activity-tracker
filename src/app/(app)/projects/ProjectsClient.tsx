@@ -342,9 +342,10 @@ export default function ProjectsClient({
     const ageRange = formatAgeRange(project.ageMin, project.ageMax);
     const deadline = project.applicationDeadline ? getDeadlineInfo(project.applicationDeadline, project.status, today) : null;
     const countries = project.eligibleCountries ?? [];
-    const projectPartners = (project.partnerIds ?? [])
-      .map((id) => partnerNames.get(id))
-      .filter((name): name is string => !!name);
+    const projectPartners = (project.partnerIds ?? []).flatMap((id) => {
+      const name = partnerNames.get(id);
+      return name ? [{ id, name }] : [];
+    });
     const max = project.maxParticipants;
     const count = project.participantCount;
     const percent = max ? Math.min(100, Math.round((count / max) * 100)) : 0;
@@ -449,8 +450,8 @@ export default function ProjectsClient({
               <dt className="sr-only">Partners</dt>
               <Handshake className="h-3.5 w-3.5 text-slate-500 shrink-0 mt-0.5" aria-hidden="true" />
               <dd className="flex flex-wrap gap-1">
-                {projectPartners.map((name) => (
-                  <span key={name} className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-300">
+                {projectPartners.map(({ id, name }) => (
+                  <span key={id} className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-300">
                     {name}
                   </span>
                 ))}
@@ -729,13 +730,16 @@ export default function ProjectsClient({
         </div>
       ) : (
         <div id="projects-panel-partners" role="tabpanel" aria-labelledby="projects-tab-partners">
-          <PartnersTable
-            partners={partners}
-            projects={projects}
-            onCreate={openCreatePartner}
-            onEdit={(partner) => setPartnerForm((prev) => ({ key: (prev?.key ?? 0) + 1, partner }))}
-            onDelete={setPartnerDeleteTarget}
-          />
+          {/* Like the projects tab: no "No partners yet" prompt when the list simply failed to load. */}
+          {(partners.length > 0 || !loadError) && (
+            <PartnersTable
+              partners={partners}
+              projects={projects}
+              onCreate={openCreatePartner}
+              onEdit={(partner) => setPartnerForm((prev) => ({ key: (prev?.key ?? 0) + 1, partner }))}
+              onDelete={setPartnerDeleteTarget}
+            />
+          )}
         </div>
       )}
 

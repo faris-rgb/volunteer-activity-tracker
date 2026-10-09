@@ -32,7 +32,8 @@ export default function RoomModal({
 }) {
   const [form, setForm] = useState<RoomForm>(() => ({
     name: room?.name ?? "",
-    location: room?.location ?? locations[0] ?? DEFAULT_LOCATIONS[0],
+    // Editing keeps "Not set"; only a new room starts at the first location.
+    location: room ? room.location ?? "" : locations[0] ?? DEFAULT_LOCATIONS[0],
     beds: String(room?.beds ?? 2),
     notes: room?.notes ?? "",
   }));

@@ -69,6 +69,9 @@ export default function TagListEditor({
       if (next.length >= SETTINGS_LIMITS.tagsPerList) {
         setLocalError(`You can add up to ${SETTINGS_LIMITS.tagsPerList} entries.`);
         onChange(next);
+        // The input is disabled once the list is full, so a leftover draft could never be cleared
+        // (and would block saving).
+        onDraftChange("");
         return;
       }
       existing.add(value.toLocaleLowerCase());

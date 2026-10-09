@@ -645,7 +645,7 @@ export default function ApplicationForm({
             value={values.emergencyRelation}
             onChange={(value) => update("emergencyRelation", value)}
             disabled={submitting}
-            maxLength={APPLICATION_LIMITS.place}
+            maxLength={APPLICATION_LIMITS.relation}
             placeholder="e.g. mother, partner"
           />
         </div>

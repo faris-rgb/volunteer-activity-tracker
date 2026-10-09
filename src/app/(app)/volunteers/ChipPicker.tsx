@@ -30,7 +30,7 @@ export default function ChipPicker({
   value,
   onChange,
   max = 30,
-  maxLength = 50,
+  maxLength = 60,
   placeholder,
   invalid,
   describedBy,

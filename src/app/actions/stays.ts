@@ -6,7 +6,7 @@ import { assertActionRole } from "@/lib/auth";
 import { actionError, actionOk, type ActionResult } from "@/lib/actionResult";
 import { MANAGER_ROLES } from "@/lib/roles";
 import { isSanityConfigured, sanityClient, sanityWriteClient } from "@/lib/sanity";
-import { formatDateKey, toDateKey } from "@/lib/dates";
+import { toDateKey } from "@/lib/dates";
 import { listMockAttendance } from "@/lib/mockAttendanceStore";
 import {
   ALLOWANCE_TYPES,
@@ -28,6 +28,7 @@ import { getVolunteersAction, type VolunteerData } from "@/app/actions/volunteer
 import { getProjectsAction } from "@/app/actions/projects";
 import { getRoomsAction } from "@/app/actions/rooms";
 import { getActivitiesResultAction } from "@/app/actions/activities";
+import { moroccoToday } from "@/app/(app)/stays/components/stayUtils";
 
 /** Everything the form edits. Allowance payments are changed through their own actions. */
 export type StayInput = Omit<Stay, "_id" | "createdAt" | "allowances">;
@@ -823,7 +824,7 @@ export async function getStayCertificateAction(stayId: string): Promise<ActionRe
     }
 
     const periodStart = stay.arrivalDate ?? project?.startDate;
-    const periodEnd = stay.departureDate ?? project?.endDate ?? formatDateKey(new Date());
+    const periodEnd = stay.departureDate ?? project?.endDate ?? moroccoToday();
     const inPeriod = attended
       .map((item) => ({ ...item, date: toDateKey(item.date) }))
       .filter((item) => item.date && (!periodStart || item.date >= periodStart) && (!periodEnd || item.date <= periodEnd))
